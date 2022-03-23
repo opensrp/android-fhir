@@ -90,7 +90,9 @@
     <string
         name="pref_key_delay_loading_barcode_result"
         translatable="false"
-    >barcode_dlbr</string> 
+    >barcode_dlbr</string>
+    <string name="multi_select_dialog_subtitle">Select all that apply</string>
     <string name="no">No</string>
     <string name="yes">Yes</string>
+    <string name="save">Save</string>
 </resources>
