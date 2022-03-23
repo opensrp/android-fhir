@@ -63,20 +63,20 @@ internal class OptionSelectDialogFragment(
   override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
     isCancelable = false
 
-    val themeId = requireContext().obtainStyledAttributes(R.styleable.QuestionnaireTheme).use {
-      it.getResourceId(
-        // Use the custom questionnaire theme if it is specified
-        R.styleable.QuestionnaireTheme_questionnaire_theme,
-        // Otherwise, use the default questionnaire theme
-        R.style.Theme_Questionnaire
-      )
-    }
+    val themeId =
+      requireContext().obtainStyledAttributes(R.styleable.QuestionnaireTheme).use {
+        it.getResourceId(
+          // Use the custom questionnaire theme if it is specified
+          R.styleable.QuestionnaireTheme_questionnaire_theme,
+          // Otherwise, use the default questionnaire theme
+          R.style.Theme_Questionnaire
+        )
+      }
 
     val dialogThemeContext = ContextThemeWrapper(requireContext(), themeId)
-    val view = LayoutInflater.from(dialogThemeContext).inflate(
-      R.layout.questionnaire_item_multi_select_dialog,
-      null
-    )
+    val view =
+      LayoutInflater.from(dialogThemeContext)
+        .inflate(R.layout.questionnaire_item_multi_select_dialog, null)
 
     val recyclerView: RecyclerView = view.findViewById(R.id.recycler_view)
     recyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -92,18 +92,14 @@ internal class OptionSelectDialogFragment(
       }
     }
 
-    val dialog = MaterialAlertDialogBuilder(requireContext())
-      .setView(view)
-      .create()
+    val dialog = MaterialAlertDialogBuilder(requireContext()).setView(view).create()
 
     view.findViewById<TextView>(R.id.dialog_title).text = title
     view.findViewById<MaterialButton>(R.id.positive_button).setOnClickListener {
       saveSelections(adapter.currentList)
       dialog.dismiss()
     }
-    view.findViewById<MaterialButton>(R.id.negative_button).setOnClickListener {
-      dialog.dismiss()
-    }
+    view.findViewById<MaterialButton>(R.id.negative_button).setOnClickListener { dialog.dismiss() }
 
     return dialog
   }
