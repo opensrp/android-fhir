@@ -88,6 +88,9 @@
         <item
             name="chipStyle"
         >@style/Questionnaire.Widget.MaterialComponents.Chip.Action</item>
+        <item name="dialogTextButtonAppearanceQuestionnaire">
+            @style/Questionnaire.Widget.MaterialComponents.TextButton
+        </item>
     </style>
 
     <style
