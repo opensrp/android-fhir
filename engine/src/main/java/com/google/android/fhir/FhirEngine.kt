@@ -20,6 +20,7 @@ import com.google.android.fhir.db.ResourceNotFoundException
 import com.google.android.fhir.db.impl.dao.LocalChangeToken
 import com.google.android.fhir.db.impl.dao.SquashedLocalChange
 import com.google.android.fhir.search.Search
+import com.google.android.fhir.search.SearchQuery
 import java.time.OffsetDateTime
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
@@ -61,6 +62,12 @@ interface FhirEngine {
    * Searches the database and returns a list resources according to the [search] specifications.
    */
   suspend fun <R : Resource> search(search: Search): List<R>
+
+
+  /**
+   * Searches the database and returns a list resources according to the [search] specifications.
+   */
+  suspend fun <R : Resource> search(searchQuery: SearchQuery): List<R>
 
   /**
    * Synchronizes the [upload] result in the database. The database will be updated to reflect the
