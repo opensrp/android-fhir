@@ -133,7 +133,6 @@ class QuestionnaireItemEditTextMultiLineViewHolderFactoryTest {
       ) {}
 
     viewHolder.bind(questionnaireItemViewItem)
-    viewHolder.itemView.findViewById<TextInputEditText>(R.id.text_input_edit_text).setText("")
 
     assertThat(questionnaireItemViewItem.questionnaireResponseItem.answer.size).isEqualTo(0)
   }
