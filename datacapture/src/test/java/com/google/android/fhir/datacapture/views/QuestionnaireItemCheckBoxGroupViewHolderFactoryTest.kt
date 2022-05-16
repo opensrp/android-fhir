@@ -343,7 +343,8 @@ class QuestionnaireItemCheckBoxGroupViewHolderFactoryTest {
           repeats = true
           required = true
         },
-        QuestionnaireResponse.QuestionnaireResponseItemComponent()
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+        modified = true
       ) {}
     )
 
