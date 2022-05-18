@@ -21,10 +21,12 @@ import com.google.android.fhir.get
 import com.google.android.fhir.search.search
 import kotlinx.coroutines.runBlocking
 import org.hl7.fhir.r4.model.CarePlan
+import org.hl7.fhir.r4.model.Coding
 import org.hl7.fhir.r4.model.Condition
 import org.hl7.fhir.r4.model.DiagnosticReport
 import org.hl7.fhir.r4.model.Encounter
 import org.hl7.fhir.r4.model.EpisodeOfCare
+import org.hl7.fhir.r4.model.Group
 import org.hl7.fhir.r4.model.Observation
 import org.hl7.fhir.r4.model.Patient
 import org.hl7.fhir.r4.model.ServiceRequest
@@ -98,7 +100,22 @@ class FhirEngineRetrieveProvider(private val fhirEngine: FhirEngine) :
               filter(CarePlan.SUBJECT, { value = "$context/$contextValue" })
             }
           }
-        else -> throw NotImplementedError("Not implemented yet")
+        "Group" ->
+          // TODO inconsistent impl
+          fhirEngine.search<Group> {
+            filter(
+              Group.TYPE,
+              {
+                value =
+                  of(
+                    with(Group.GroupType.PERSON) {
+                      Coding(this.system, this.toCode(), this.display)
+                    }
+                  )
+              }
+            )
+          }
+        else -> throw NotImplementedError("Data type $dataType Not implemented yet")
       }
     }
   }

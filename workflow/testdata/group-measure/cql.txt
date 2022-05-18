@@ -1,0 +1,37 @@
+//Declare name and version of lib
+library PQMedication version '1'
+
+//FHIR as a data model and version of FHIR
+using FHIR version '4.0.1'
+
+//functions to help FHIR vs CQL primitives
+include "FHIRHelpers" version '4.0.1' called FHIRHelpers
+
+define "Group": [Group] G
+
+define "Initial Population": [Group] G
+
+define "Group Members": [Group] G return (G.member M return M.entity)
+
+define "Males": "Group Members" M
+where M.gender = 'male'
+
+define "Feales": "Group Members" M
+where M.gender = 'female'
+
+define Denominator:
+  exists (
+    "Initial Population" D
+      where D.member starts during "Measurement Period"
+  )
+
+
+// helper functions
+define function "CreateConcept"(code Code):
+  CodeableConcept { coding: {
+        Coding {
+          code: code {value: "code".code },
+          system: uri {value: "code".system },
+          display: string {value: "code".display }
+        }
+  } }

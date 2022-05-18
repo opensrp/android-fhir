@@ -22,11 +22,18 @@ import com.google.android.fhir.FhirEngine
 import com.google.android.fhir.FhirEngineProvider
 import com.google.android.fhir.testing.FhirEngineProviderTestRule
 import com.google.common.truth.Truth.assertThat
+import java.util.Base64
 import java.util.Date
 import kotlinx.coroutines.runBlocking
+import org.cqframework.cql.cql2elm.CqlTranslator
+import org.cqframework.cql.cql2elm.CqlTranslatorOptions
+import org.cqframework.cql.cql2elm.FhirLibrarySourceProvider
+import org.cqframework.cql.cql2elm.LibraryManager
+import org.cqframework.cql.cql2elm.ModelManager
 import org.hl7.fhir.r4.model.Bundle
 import org.hl7.fhir.r4.model.DateType
 import org.hl7.fhir.r4.model.Library
+import org.hl7.fhir.r4.model.Measure
 import org.hl7.fhir.r4.model.MeasureReport
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
@@ -55,6 +62,12 @@ class FhirOperatorTest {
 
     private fun parseJson(path: String): Bundle =
       jsonParser.parseResource(jsonParser.javaClass.getResourceAsStream(path)) as Bundle
+
+    private fun readResourceAsString(path: String) =
+      FhirOperatorTest::class.java.getResourceAsStream(path)!!.readBytes().decodeToString()
+
+    private fun <T> parseResource(path: String) =
+      jsonParser.parseResource(readResourceAsString(path)) as T
   }
 
   @Before
@@ -185,6 +198,49 @@ class FhirOperatorTest {
   }
 
   @Test
+  fun evaluateGroupPopulationMeasure() = runBlocking {
+    val resourceBundle = Bundle()
+
+    val resourceDir = "/group-measure"
+    val cqlElm = toJsonElm(readResourceAsString("$resourceDir/cql.txt"))
+
+    resourceBundle.addEntry().apply {
+      this.resource =
+        jsonParser.parseResource(
+          readResourceAsString("$resourceDir/library.json")
+            .replace("#library-elm.json", cqlElm.readStringToBase64Encoded())
+        ) as
+          Library
+    }
+
+    resourceBundle.addEntry().apply {
+      this.resource = parseResource<Library>("/lib-fhir-helper.json")
+    }
+    resourceBundle.addEntry().apply {
+      this.resource = parseResource<Measure>("$resourceDir/measure.json")
+    }
+
+    loadBundle(resourceBundle)
+    loadBundle(parseJson("$resourceDir/groups-bundle.json"))
+
+    val measureReport =
+      fhirOperator.evaluateMeasure(
+        measureUrl = "Measure/group-measure",
+        start = "2019-01-01",
+        end = "2022-12-31",
+        reportType = "population",
+        subject = "Group/my-test-group",
+        practitioner = null,
+        lastReceivedOn = null
+      )
+    val measureReportJSON =
+      FhirContext.forR4().newJsonParser().encodeResourceToString(measureReport)
+
+    println(jsonParser.parseResource(measureReportJSON))
+    // TODO add assertions
+  }
+
+  @Test
   fun evaluateIndividualSubjectMeasure() = runBlocking {
     fhirEngine.run {
       loadFile("/first-contact/01-registration/patient-charity-otala-1.json")
@@ -285,6 +341,7 @@ class FhirOperatorTest {
       fhirEngine.create(resource)
     }
   }
+
   private suspend fun loadBundle(bundle: Bundle) {
     for (entry in bundle.entry) {
       when (entry.resource.resourceType) {
@@ -293,5 +350,24 @@ class FhirOperatorTest {
         else -> fhirEngine.create(entry.resource)
       }
     }
+  }
+
+  private fun toJsonElm(cql: String): String {
+    val libraryManager = LibraryManager(ModelManager())
+    libraryManager.librarySourceLoader.registerProvider(FhirLibrarySourceProvider())
+
+    val translator: CqlTranslator =
+      CqlTranslator.fromText(
+        cql,
+        libraryManager.modelManager,
+        libraryManager,
+        *CqlTranslatorOptions.defaultOptions().options.toTypedArray()
+      )
+
+    return translator.toJxson().also { println(it.replace("\n", "").replace("   ", "")) }
+  }
+
+  private fun String.readStringToBase64Encoded(): String {
+    return Base64.getEncoder().encodeToString(this.toByteArray())
   }
 }
