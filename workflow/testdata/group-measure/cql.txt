@@ -11,27 +11,15 @@ define "Group": [Group] G
 
 define "Initial Population": [Group] G
 
-define "Group Members": [Group] G return (G.member M return M.entity)
+define "Group Members": flatten([Group] G return (G.member M return M.entity))
 
-define "Males": "Group Members" M
+define "Males": [Patient] M
+    with "Group Members" G
+        such that M.id = Split(G.reference, '/')[1]
 where M.gender = 'male'
 
-define "Feales": "Group Members" M
+
+define "Females": [Patient] M
+    with "Group Members" G
+        such that M.id = Split(G.reference, '/')[1]
 where M.gender = 'female'
-
-define Denominator:
-  exists (
-    "Initial Population" D
-      where D.member starts during "Measurement Period"
-  )
-
-
-// helper functions
-define function "CreateConcept"(code Code):
-  CodeableConcept { coding: {
-        Coding {
-          code: code {value: "code".code },
-          system: uri {value: "code".system },
-          display: string {value: "code".display }
-        }
-  } }

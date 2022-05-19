@@ -2,10 +2,10 @@
   "resourceType": "Bundle",
   "entry": [
     {
-      "fullUrl": "https://fhir.labs.smartregister.org:443/fhir/Group/107759",
+      "fullUrl": "https://fhir.labs.smartregister.org:443/fhir/Group/my-test-group",
       "resource": {
         "resourceType": "Group",
-        "id": "107759",
+        "id": "my-test-group",
         "meta": {
           "versionId": "5",
           "lastUpdated": "2022-05-05T07:38:49.542+00:00",
@@ -14,7 +14,7 @@
         "identifier": [
           {
             "use": "official",
-            "value": "7bb7fa82-59e4-4744-a6d2-96722afca23b"
+            "value": "my-test-group"
           },
           {
             "use": "secondary",

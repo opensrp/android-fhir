@@ -13,7 +13,7 @@
         "valueCode": "structured"
     } ],
     "version": "1",
-    "name": "Group measure test",
+    "name": "group-measure",
     "title": "Group measure test library",
     "status": "active",
     "type": {

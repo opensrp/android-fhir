@@ -22,19 +22,19 @@ import com.google.android.fhir.FhirEngine
 import com.google.android.fhir.FhirEngineProvider
 import com.google.android.fhir.testing.FhirEngineProviderTestRule
 import com.google.common.truth.Truth.assertThat
-import java.util.Base64
-import java.util.Date
 import kotlinx.coroutines.runBlocking
 import org.cqframework.cql.cql2elm.CqlTranslator
 import org.cqframework.cql.cql2elm.CqlTranslatorOptions
 import org.cqframework.cql.cql2elm.FhirLibrarySourceProvider
 import org.cqframework.cql.cql2elm.LibraryManager
 import org.cqframework.cql.cql2elm.ModelManager
+import org.cqframework.cql.elm.execution.VersionedIdentifier
 import org.hl7.fhir.r4.model.Bundle
 import org.hl7.fhir.r4.model.DateType
 import org.hl7.fhir.r4.model.Library
 import org.hl7.fhir.r4.model.Measure
 import org.hl7.fhir.r4.model.MeasureReport
+import org.hl7.fhir.r4.model.Parameters
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
 import org.junit.Before
@@ -43,6 +43,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.util.Base64
+import java.util.Date
 
 @RunWith(RobolectricTestRunner::class)
 class FhirOperatorTest {
@@ -104,12 +106,12 @@ class FhirOperatorTest {
   @Test
   fun `evaluateMeasure for subject with observation has denominator and numerator`() = runBlocking {
     fhirEngine.run {
-      loadFile("/validated-resources/anc-patient-example.json")
-      loadFile("/validated-resources/Antenatal-care-case.json")
-      loadFile("/validated-resources/First-antenatal-care-contact.json")
-      loadFile("/validated-resources/observation-anc-b6-de17-example.json")
-      loadFile("/validated-resources/Practitioner.xml")
-      loadFile("/validated-resources/PractitionerRole.xml")
+      loadFile("/validated-resources2/anc-patient-example-1.json")
+      loadFile("/validated-resources2/Antenatal-care-case-1.json")
+      loadFile("/validated-resources2/First-antenatal-care-contact-1.json")
+      loadFile("/validated-resources2/observation-anc-b6-de17-example-1.json")
+      loadFile("/validated-resources2/Practitioner.xml")
+      loadFile("/validated-resources2/PractitionerRole.xml")
     }
 
     val measureReport =
@@ -118,14 +120,18 @@ class FhirOperatorTest {
         start = "2020-01-01",
         end = "2020-01-31",
         reportType = "subject",
-        subject = "anc-patient-example",
+        subject = "anc-patient-example-1",
         practitioner = "jane",
         lastReceivedOn = null
       )
     assertThat(measureReport.evaluatedResource[1].reference)
-      .isEqualTo("Observation/anc-b6-de17-example")
+      .isEqualTo("Observation/anc-b6-de17-example-1")
     assertThat(measureReport.evaluatedResource[0].reference)
-      .isEqualTo("Encounter/First-antenatal-care-contact-example")
+            .isEqualTo("EpisodeOfCare/antenatal-care-case-example-1")
+    assertThat(measureReport.evaluatedResource[2].reference)
+            .isEqualTo("Patient/anc-patient-example-1")
+    assertThat(measureReport.evaluatedResource[3].reference)
+      .isEqualTo("Encounter/First-antenatal-care-contact-example-1")
     val population = measureReport.group.first().population
     assertThat(population[1].id).isEqualTo("denominator")
     assertThat(population[2].id).isEqualTo("numerator")
@@ -223,6 +229,11 @@ class FhirOperatorTest {
     loadBundle(resourceBundle)
     loadBundle(parseJson("$resourceDir/groups-bundle.json"))
 
+    fhirOperator.libraryProcessor.evaluate("http://fhir.org/guides/cqf/common/Library/group-measure", null, null, null, null, null, null, null).run {
+      this as Parameters
+      println(this.parameter.map { it.name + "--------------" + it.value + " --------- " + it.resource})
+    }
+
     val measureReport =
       fhirOperator.evaluateMeasure(
         measureUrl = "Measure/group-measure",
@@ -236,7 +247,7 @@ class FhirOperatorTest {
     val measureReportJSON =
       FhirContext.forR4().newJsonParser().encodeResourceToString(measureReport)
 
-    println(jsonParser.parseResource(measureReportJSON))
+    println(measureReportJSON)
     // TODO add assertions
   }
 

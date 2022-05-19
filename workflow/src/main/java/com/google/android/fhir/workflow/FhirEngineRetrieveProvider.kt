@@ -25,6 +25,7 @@ import org.hl7.fhir.r4.model.Coding
 import org.hl7.fhir.r4.model.Condition
 import org.hl7.fhir.r4.model.DiagnosticReport
 import org.hl7.fhir.r4.model.Encounter
+import org.hl7.fhir.r4.model.Enumerations
 import org.hl7.fhir.r4.model.EpisodeOfCare
 import org.hl7.fhir.r4.model.Group
 import org.hl7.fhir.r4.model.Observation
@@ -57,6 +58,10 @@ class FhirEngineRetrieveProvider(private val fhirEngine: FhirEngine) :
             mutableListOf(fhirEngine.get<Patient>(contextValue))
           } else {
             fhirEngine.search<Patient> { filter(Patient.ACTIVE, { value = of(true) }) }
+            listOf(Patient().apply {
+              this.id = "c535f2e6-a17a-4b2a-913e-30e8b42553d0"
+              this.gender = Enumerations.AdministrativeGender.MALE
+            })
           }
         "EpisodeOfCare" ->
           fhirEngine.search<EpisodeOfCare> {
@@ -114,7 +119,11 @@ class FhirEngineRetrieveProvider(private val fhirEngine: FhirEngine) :
                   )
               }
             )
-          }
+          }.let {
+            it.map { it.apply {
+              this.id = "Group/my-test-group"
+            } }
+        }
         else -> throw NotImplementedError("Data type $dataType Not implemented yet")
       }
     }

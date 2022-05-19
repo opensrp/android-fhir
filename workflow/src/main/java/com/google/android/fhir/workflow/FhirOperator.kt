@@ -19,6 +19,7 @@ package com.google.android.fhir.workflow
 import ca.uhn.fhir.context.FhirContext
 import ca.uhn.fhir.context.FhirVersionEnum
 import com.google.android.fhir.FhirEngine
+import org.cqframework.cql.cql2elm.CqlTranslatorOptions
 import org.hl7.fhir.r4.model.CarePlan
 import org.hl7.fhir.r4.model.IdType
 import org.hl7.fhir.r4.model.Library
@@ -115,7 +116,7 @@ class FhirOperator(fhirContext: FhirContext, fhirEngine: FhirEngine) {
     )
   private val endpointConverter = EndpointConverter(adapterFactory)
   private val fhirModelResolverFactory = FhirModelResolverFactory()
-  private val libraryProcessor =
+  val libraryProcessor =
     LibraryProcessor(
       fhirContext,
       cqlFhirParameterConverter,
@@ -124,7 +125,9 @@ class FhirOperator(fhirContext: FhirContext, fhirEngine: FhirEngine) {
       terminologyProviderFactory,
       endpointConverter,
       fhirModelResolverFactory
-    ) { CqlEvaluatorBuilder() }
+    ) { CqlEvaluatorBuilder().withLibraryContentProvider(libraryContentProvider)
+            .withModelResolver(FhirVersionEnum.R4.name, R4FhirModelResolver())
+            .withRetrieveProvider(FhirVersionEnum.R4.name, fhirEngineRetrieveProvider)}
 
   private val expressionEvaluator =
     ExpressionEvaluator(
