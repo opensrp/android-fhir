@@ -106,8 +106,11 @@ class FhirOperatorTest {
   @Test
   fun `evaluateMeasure for subject with observation has denominator and numerator`() = runBlocking {
     fhirEngine.run {
+      loadFile("/validated-resources/anc-patient-example.json")
+      loadFile("/validated-resources/Antenatal-care-case.json")
+      loadFile("/validated-resources/First-antenatal-care-contact.json")
+      loadFile("/validated-resources/observation-anc-b6-de17-example.json")
       loadFile("/validated-resources2/anc-patient-example-1.json")
-      loadFile("/validated-resources2/Antenatal-care-case-1.json")
       loadFile("/validated-resources2/First-antenatal-care-contact-1.json")
       loadFile("/validated-resources2/observation-anc-b6-de17-example-1.json")
       loadFile("/validated-resources2/Practitioner.xml")
@@ -119,8 +122,8 @@ class FhirOperatorTest {
         measureUrl = "http://fhir.org/guides/who/anc-cds/Measure/ANCIND01",
         start = "2020-01-01",
         end = "2020-01-31",
-        reportType = "subject",
-        subject = "anc-patient-example-1",
+        reportType = "population",
+        subject = null,
         practitioner = "jane",
         lastReceivedOn = null
       )
@@ -227,7 +230,7 @@ class FhirOperatorTest {
     }
 
     loadBundle(resourceBundle)
-    loadBundle(parseJson("$resourceDir/groups-bundle.json"))
+    loadBundle(parseJson("$resourceDir/patient-bundle.json"))
 
     fhirOperator.libraryProcessor.evaluate("http://fhir.org/guides/cqf/common/Library/group-measure", null, null, null, null, null, null, null).run {
       this as Parameters
@@ -240,7 +243,7 @@ class FhirOperatorTest {
         start = "2019-01-01",
         end = "2022-12-31",
         reportType = "population",
-        subject = "Group/my-test-group",
+        subject = null,
         practitioner = null,
         lastReceivedOn = null
       )

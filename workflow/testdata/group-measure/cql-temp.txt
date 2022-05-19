@@ -1,0 +1,29 @@
+//Declare name and version of lib
+library PQMedication version '1'
+
+//FHIR as a data model and version of FHIR
+using FHIR version '4.0.1'
+
+//functions to help FHIR vs CQL primitives
+include "FHIRHelpers" version '4.0.1' called FHIRHelpers
+
+define "Group": [Group] G
+
+define "Initial Population": [Patient] G
+define "Denominator": [Patient] G
+define "Numerator": [Patient] G where G.gender='male'
+
+
+
+define "Group Members": flatten([Group] G return (G.member M return M.entity))
+
+define "Males": [Patient] M
+    with "Group Members" G
+        such that M.id = Split(G.reference, '/')[1]
+where M.gender = 'male'
+
+
+define "Females": [Patient] M
+    with "Group Members" G
+        such that M.id = Split(G.reference, '/')[1]
+where M.gender = 'female'

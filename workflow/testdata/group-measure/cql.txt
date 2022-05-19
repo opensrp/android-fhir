@@ -7,19 +7,18 @@ using FHIR version '4.0.1'
 //functions to help FHIR vs CQL primitives
 include "FHIRHelpers" version '4.0.1' called FHIRHelpers
 
-define "Group": [Group] G
+define "Initial Population": [Patient] G
+define "Denominator": [Patient] G
+define "Males": "Denominator" G where G.gender='male'
+define "Females": "Denominator" G where G.gender='female'
 
-define "Initial Population": [Group] G
-
-define "Group Members": flatten([Group] G return (G.member M return M.entity))
-
-define "Males": [Patient] M
-    with "Group Members" G
-        such that M.id = Split(G.reference, '/')[1]
-where M.gender = 'male'
-
-
-define "Females": [Patient] M
-    with "Group Members" G
-        such that M.id = Split(G.reference, '/')[1]
-where M.gender = 'female'
+(0-11, 1-5, 6-14, 15-49, 50+
+define "By Age":
+  case
+    when AgeInYearsAt(start of "Measurement Period") in Interval[0] then "P0Y"
+    when AgeInYearsAt(start of "Measurement Period") in Interval[1,5] then "P1--5Y"
+    when AgeInYearsAt(start of "Measurement Period") in Interval[6, 14] then "P6--14Y"
+    when AgeInYearsAt(start of "Measurement Period") in Interval[15, 49] then "P15--49Y"
+    when AgeInYearsAt(start of "Measurement Period") >= 50 then "P50Y"
+    else null
+  end
