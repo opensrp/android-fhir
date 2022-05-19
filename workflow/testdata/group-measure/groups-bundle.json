@@ -39,14 +39,14 @@
         "member": [
           {
             "entity": {
-              "reference": "Patient/c535f2e6-a17a-4b2a-913e-30e8b42553d0",
+              "reference": "Patient/1",
               "display": "Rao Kamwana"
             },
             "inactive": false
           },
           {
             "entity": {
-              "reference": "Patient/1742d6b6-1615-4365-8a3c-cf2ad1cc0304"
+              "reference": "Patient/2"
             }
           }
         ]
@@ -172,7 +172,7 @@
         "member": [
           {
             "entity": {
-              "reference": "Patient/f117e2e2-91ac-4345-9892-6e0aae785b39"
+              "reference": "Patient/3"
             }
           }
         ]
@@ -299,12 +299,12 @@
         "member": [
           {
             "entity": {
-              "reference": "Patient/7d84a2d0-8706-485a-85f5-8313f16bafa1"
+              "reference": "Patient/4"
             }
           },
           {
             "entity": {
-              "reference": "Patient/0beaa1e3-64a9-436f-91af-36cbdaff5628"
+              "reference": "Patient/5"
             }
           }
         ]
@@ -351,7 +351,7 @@
         "member": [
           {
             "entity": {
-              "reference": "Patient/83ca19e1-123a-42c1-8a74-342a85c41f20"
+              "reference": "Patient/6"
             }
           }
         ]
@@ -398,7 +398,7 @@
         "member": [
           {
             "entity": {
-              "reference": "Patient/8628a228-15ea-47fb-9459-662145e9e19d"
+              "reference": "Patient/7"
             }
           }
         ]
@@ -479,7 +479,7 @@
         "member": [
           {
             "entity": {
-              "reference": "Patient/d213fa70-c6a6-4f64-8d13-ef147cc9a7b5"
+              "reference": "Patient/8"
             }
           }
         ]
@@ -526,7 +526,7 @@
         "member": [
           {
             "entity": {
-              "reference": "Patient/8f730a53-12c1-4ac8-bbf6-07076ab70ea4"
+              "reference": "Patient/9"
             }
           }
         ]
@@ -650,17 +650,17 @@
         "member": [
           {
             "entity": {
-              "reference": "Patient/b1ef2f2d-fd0c-4377-96a7-fbdf571cfd16"
+              "reference": "Patient/10"
             }
           },
           {
             "entity": {
-              "reference": "Patient/d90fc81a-bbcb-466c-afdc-5c4831382043"
+              "reference": "Patient/11"
             }
           },
           {
             "entity": {
-              "reference": "Patient/4a25990a-5b6e-43ee-a2b5-ceaeb53256a6"
+              "reference": "Patient/12"
             }
           }
         ]
@@ -703,7 +703,24 @@
         "name": "Koinange",
         "managingEntity": {
           "reference": "Organization/105"
-        }
+        },
+        "member": [
+          {
+            "entity": {
+              "reference": "Patient/13"
+            }
+          },
+          {
+            "entity": {
+              "reference": "Patient/14"
+            }
+          },
+          {
+            "entity": {
+              "reference": "Patient/15"
+            }
+          }
+        ]
       },
       "search": {
         "mode": "match"
@@ -743,7 +760,24 @@
         "name": "Monrovia",
         "managingEntity": {
           "reference": "Organization/105"
-        }
+        },
+        "member": [
+          {
+            "entity": {
+              "reference": "Patient/16"
+            }
+          },
+          {
+            "entity": {
+              "reference": "Patient/17"
+            }
+          },
+          {
+            "entity": {
+              "reference": "Patient/18"
+            }
+          }
+        ]
       },
       "search": {
         "mode": "match"
@@ -783,7 +817,19 @@
         "name": "Tumaini",
         "managingEntity": {
           "reference": "Organization/105"
-        }
+        },
+        "member": [
+          {
+            "entity": {
+              "reference": "Patient/19"
+            }
+          },
+          {
+            "entity": {
+              "reference": "Patient/20"
+            }
+          }
+        ]
       },
       "search": {
         "mode": "match"

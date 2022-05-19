@@ -22,13 +22,14 @@ import com.google.android.fhir.FhirEngine
 import com.google.android.fhir.FhirEngineProvider
 import com.google.android.fhir.testing.FhirEngineProviderTestRule
 import com.google.common.truth.Truth.assertThat
+import java.util.Base64
+import java.util.Date
 import kotlinx.coroutines.runBlocking
 import org.cqframework.cql.cql2elm.CqlTranslator
 import org.cqframework.cql.cql2elm.CqlTranslatorOptions
 import org.cqframework.cql.cql2elm.FhirLibrarySourceProvider
 import org.cqframework.cql.cql2elm.LibraryManager
 import org.cqframework.cql.cql2elm.ModelManager
-import org.cqframework.cql.elm.execution.VersionedIdentifier
 import org.hl7.fhir.r4.model.Bundle
 import org.hl7.fhir.r4.model.DateType
 import org.hl7.fhir.r4.model.Library
@@ -43,8 +44,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import java.util.Base64
-import java.util.Date
 
 @RunWith(RobolectricTestRunner::class)
 class FhirOperatorTest {
@@ -130,9 +129,9 @@ class FhirOperatorTest {
     assertThat(measureReport.evaluatedResource[1].reference)
       .isEqualTo("Observation/anc-b6-de17-example-1")
     assertThat(measureReport.evaluatedResource[0].reference)
-            .isEqualTo("EpisodeOfCare/antenatal-care-case-example-1")
+      .isEqualTo("EpisodeOfCare/antenatal-care-case-example-1")
     assertThat(measureReport.evaluatedResource[2].reference)
-            .isEqualTo("Patient/anc-patient-example-1")
+      .isEqualTo("Patient/anc-patient-example-1")
     assertThat(measureReport.evaluatedResource[3].reference)
       .isEqualTo("Encounter/First-antenatal-care-contact-example-1")
     val population = measureReport.group.first().population
@@ -230,12 +229,25 @@ class FhirOperatorTest {
     }
 
     loadBundle(resourceBundle)
-    loadBundle(parseJson("$resourceDir/patient-bundle.json"))
+    loadBundle(parseJson("$resourceDir/groups-bundle.json"))
+    loadBundle(parseJson("$resourceDir/patients-bundle.json"))
 
-    fhirOperator.libraryProcessor.evaluate("http://fhir.org/guides/cqf/common/Library/group-measure", null, null, null, null, null, null, null).run {
-      this as Parameters
-      println(this.parameter.map { it.name + "--------------" + it.value + " --------- " + it.resource})
-    }
+    fhirOperator.libraryProcessor.evaluate(
+        "http://fhir.org/guides/cqf/common/Library/group-measure",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      )
+      .run {
+        this as Parameters
+        println(
+          this.parameter.map { it.name + "--------------" + it.value + " --------- " + it.resource }
+        )
+      }
 
     val measureReport =
       fhirOperator.evaluateMeasure(
@@ -251,6 +263,18 @@ class FhirOperatorTest {
       FhirContext.forR4().newJsonParser().encodeResourceToString(measureReport)
 
     println(measureReportJSON)
+
+    measureReport.group.forEach {
+      println("POPULATION - ${it.id}: " + it.population.map { "${it.id} = ${it.count}" })
+      println("SCORE      - ${it.measureScore.value}")
+      println("STRATIFIER - ${it.stratifierFirstRep.id}:")
+      println(
+        it.stratifierFirstRep.stratum.map {
+          "${it.value.text} -- ${it.population.map { it.id + "=" + it.count} } \n"
+        }
+      )
+    }
+
     // TODO add assertions
   }
 
