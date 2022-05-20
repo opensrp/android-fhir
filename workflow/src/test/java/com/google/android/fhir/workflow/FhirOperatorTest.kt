@@ -35,7 +35,6 @@ import org.hl7.fhir.r4.model.DateType
 import org.hl7.fhir.r4.model.Library
 import org.hl7.fhir.r4.model.Measure
 import org.hl7.fhir.r4.model.MeasureReport
-import org.hl7.fhir.r4.model.Parameters
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
 import org.junit.Before
@@ -231,23 +230,6 @@ class FhirOperatorTest {
     loadBundle(resourceBundle)
     loadBundle(parseJson("$resourceDir/groups-bundle.json"))
     loadBundle(parseJson("$resourceDir/patients-bundle.json"))
-
-    fhirOperator.libraryProcessor.evaluate(
-        "http://fhir.org/guides/cqf/common/Library/group-measure",
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      )
-      .run {
-        this as Parameters
-        println(
-          this.parameter.map { it.name + "--------------" + it.value + " --------- " + it.resource }
-        )
-      }
 
     val measureReport =
       fhirOperator.evaluateMeasure(

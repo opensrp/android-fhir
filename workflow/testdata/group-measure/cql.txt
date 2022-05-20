@@ -10,14 +10,15 @@ include "FHIRHelpers" version '4.0.1' called FHIRHelpers
 context Patient
 
 define "All Groups": [Group] G
-define "All Group Members": flatten("All Groups" G return (G.member M return M.entity))
+define "All Person Groups": "All Groups" G where G.type = 'person'
+define "All Group Members": flatten("All Person Groups" G return (G.member M return M.entity))
+
 define "All Patients": [Patient] P
     with "All Group Members" G
         such that P.id = Split(G.reference, '/')[1]
 
-define "Denominator": "All Patients" P
-define "Males": "Denominator" M where M.gender='male'
-define "Females": "Denominator" F where F.gender='female'
+define "Males": "All Patients" M where M.gender='male'
+define "Females": "All Patients" F where F.gender='female'
 
 define "Age": CalculateAgeInYears(Patient.birthDate)
 

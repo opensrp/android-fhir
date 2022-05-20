@@ -74,7 +74,7 @@
           },
           "criteria": {
             "language": "text/cql-identifier",
-            "expression": "All Groups"
+            "expression": "All Person Groups"
           }
         },
         {
@@ -89,7 +89,7 @@
           },
           "criteria": {
             "language": "text/cql-identifier",
-            "expression": "All Groups"
+            "expression": "All Person Groups"
           }
         }
       ]
@@ -124,7 +124,7 @@
           },
           "criteria": {
             "language": "text/cql-identifier",
-            "expression": "Denominator"
+            "expression": "All Patients"
           }
         },
         {
@@ -183,7 +183,7 @@
           },
           "criteria": {
             "language": "text/cql-identifier",
-            "expression": "Denominator"
+            "expression": "All Patients"
           }
         },
         {
