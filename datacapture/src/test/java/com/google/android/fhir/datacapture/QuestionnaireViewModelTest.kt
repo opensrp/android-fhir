@@ -23,21 +23,26 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import ca.uhn.fhir.context.FhirContext
 import ca.uhn.fhir.parser.IParser
+import com.google.android.fhir.datacapture.QuestionnaireFragment.Companion.EXTRA_ENABLE_REVIEW_PAGE
 import com.google.android.fhir.datacapture.QuestionnaireFragment.Companion.EXTRA_QUESTIONNAIRE_JSON_STRING
 import com.google.android.fhir.datacapture.QuestionnaireFragment.Companion.EXTRA_QUESTIONNAIRE_JSON_URI
 import com.google.android.fhir.datacapture.QuestionnaireFragment.Companion.EXTRA_QUESTIONNAIRE_RESPONSE_JSON_STRING
 import com.google.android.fhir.datacapture.QuestionnaireFragment.Companion.EXTRA_QUESTIONNAIRE_RESPONSE_JSON_URI
 import com.google.android.fhir.datacapture.common.datatype.asStringValue
+import com.google.android.fhir.datacapture.QuestionnaireFragment.Companion.EXTRA_SHOW_REVIEW_PAGE_FIRST
 import com.google.android.fhir.datacapture.testing.DataCaptureTestApplication
-import com.google.android.fhir.datacapture.validation.ValidationResult
+import com.google.android.fhir.datacapture.validation.Invalid
+import com.google.android.fhir.datacapture.validation.NotValidated
 import com.google.android.fhir.datacapture.views.QuestionnaireItemViewItem
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.util.Calendar
 import java.util.Date
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -55,6 +60,7 @@ import org.hl7.fhir.r4.model.QuestionnaireResponse
 import org.hl7.fhir.r4.model.StringType
 import org.hl7.fhir.r4.model.ValueSet
 import org.junit.Assert
+import org.hl7.fhir.r4.utils.ToolingExtensions
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
@@ -132,7 +138,10 @@ class QuestionnaireViewModelTest(
       viewModel.getQuestionnaireResponse(),
       QuestionnaireResponse().apply {
         addItem(
-          QuestionnaireResponse.QuestionnaireResponseItemComponent().apply { linkId = "a-link-id" }
+          QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
+            linkId = "a-link-id"
+            text = "Yes or no?"
+          }
         )
       }
     )
@@ -166,9 +175,11 @@ class QuestionnaireViewModelTest(
         addItem(
           QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
             linkId = "a-link-id"
+            text = "Basic questions"
             addItem(
               QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
                 linkId = "another-link-id"
+                text = "Name?"
               }
             )
           }
@@ -516,6 +527,7 @@ class QuestionnaireViewModelTest(
         addItem(
           QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
             linkId = "a-link-id"
+            text = "Basic question which allows multiple answers"
             addAnswer(
               QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
                 value = StringType("string 1")
@@ -606,6 +618,7 @@ class QuestionnaireViewModelTest(
         addItem(
           QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
             linkId = "a-link-id"
+            text = "Basic question"
             addAnswer(
               QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
                 value = BooleanType(false)
@@ -644,6 +657,7 @@ class QuestionnaireViewModelTest(
         addItem(
           QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
             linkId = "a-link-id"
+            text = "Basic question"
             addAnswer(
               QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
                 value = BooleanType(true)
@@ -690,7 +704,139 @@ class QuestionnaireViewModelTest(
   }
 
   @Test
-  fun questionnaireHasMoreThanOneInitialValuesAndNotRepeating_shouldThrowError() {
+  fun `getQuestionnaireResponse() should have text in questionnaire response item`() {
+    val questionnaire =
+      Questionnaire().apply {
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "a-link-id"
+            text = "Basic question"
+            type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            addInitial(
+              Questionnaire.QuestionnaireItemInitialComponent().apply { value = BooleanType(false) }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+
+    assertResourceEquals(
+      viewModel.getQuestionnaireResponse(),
+      QuestionnaireResponse().apply {
+        addItem(
+          QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
+            linkId = "a-link-id"
+            text = "Basic question"
+            addAnswer(
+              QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
+                value = BooleanType(false)
+              }
+            )
+          }
+        )
+      }
+    )
+  }
+
+  @Test
+  fun `getQuestionnaireResponse() should have translated text in questionnaire response item`() {
+    val questionnaire =
+      Questionnaire().apply {
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "a-link-id"
+            textElement.apply {
+              addExtension(
+                Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+                  addExtension(Extension("lang", StringType("en-US")))
+                  addExtension(Extension("content", StringType("Basic Question")))
+                }
+              )
+            }
+            type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            addInitial(
+              Questionnaire.QuestionnaireItemInitialComponent().apply { value = BooleanType(false) }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+
+    assertResourceEquals(
+      viewModel.getQuestionnaireResponse(),
+      QuestionnaireResponse().apply {
+        addItem(
+          QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
+            linkId = "a-link-id"
+            text = "Basic Question"
+            addAnswer(
+              QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
+                value = BooleanType(false)
+              }
+            )
+          }
+        )
+      }
+    )
+  }
+
+  @Test
+  fun `getQuestionnaireResponse() should have text in questionnaire response item for nested items`() {
+    val questionnaire =
+      Questionnaire().apply {
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "a-link-id"
+            text = "Basic question"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "a.1-link-id"
+                text = "Basic Nested question"
+                type = Questionnaire.QuestionnaireItemType.STRING
+                initial =
+                  mutableListOf(
+                    Questionnaire.QuestionnaireItemInitialComponent().apply {
+                      value = StringType("Test Value")
+                    }
+                  )
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+
+    assertResourceEquals(
+      viewModel.getQuestionnaireResponse(),
+      QuestionnaireResponse().apply {
+        addItem(
+          QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
+            linkId = "a-link-id"
+            text = "Basic question"
+            addItem(
+              QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
+                linkId = "a.1-link-id"
+                text = "Basic Nested question"
+                answer =
+                  listOf(
+                    QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
+                      value = StringType("Test Value")
+                    }
+                  )
+              }
+            )
+          }
+        )
+      }
+    )
+  }
+
+  @Test
+  fun `createQuestionnaireViewModel() should throw IllegalArgumentException for multiple initial values with non repeating item`() {
     val questionnaire =
       Questionnaire().apply {
         id = "a-questionnaire"
@@ -906,8 +1052,7 @@ class QuestionnaireViewModelTest(
       }
     val viewModel = createQuestionnaireViewModel(questionnaire)
     val questionnaireItemViewItemList = viewModel.getQuestionnaireItemViewItemList()
-    assertThat(questionnaireItemViewItemList.single().validationResult)
-      .isEqualTo(ValidationResult(true, listOf()))
+    assertThat(questionnaireItemViewItemList.single().validationResult).isEqualTo(NotValidated)
   }
 
   @Test
@@ -938,7 +1083,7 @@ class QuestionnaireViewModelTest(
 
       ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
       assertThat(questionnaireItemViewItem!!.validationResult)
-        .isEqualTo(ValidationResult(false, listOf("Missing answer for required field.")))
+        .isEqualTo(Invalid(listOf("Missing answer for required field.")))
     } finally {
       observer.cancel()
       ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
@@ -1034,9 +1179,11 @@ class QuestionnaireViewModelTest(
         addItem(
           QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
             linkId = "a-group-item"
+            text = "Group question"
             addItem(
               QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
                 linkId = "a-nested-item"
+                text = "Basic question"
                 addAnswer(
                   QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
                     this.value = valueBooleanType.setValue(false)
@@ -1159,6 +1306,7 @@ class QuestionnaireViewModelTest(
     assertThat(state.pagination)
       .isEqualTo(
         QuestionnairePagination(
+          isPaginated = true,
           pages = listOf(QuestionnairePage(0, true), QuestionnairePage(1, true)),
           currentPageIndex = 0
         )
@@ -1223,7 +1371,11 @@ class QuestionnaireViewModelTest(
       ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
       assertThat(pagination)
         .isEqualTo(
-          QuestionnairePagination(listOf(QuestionnairePage(0, true), QuestionnairePage(1, true)), 1)
+          QuestionnairePagination(
+            isPaginated = true,
+            pages = listOf(QuestionnairePage(0, true), QuestionnairePage(1, true)),
+            currentPageIndex = 1
+          )
         )
     } finally {
       observer.cancel()
@@ -1281,7 +1433,11 @@ class QuestionnaireViewModelTest(
       ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
       assertThat(pagination)
         .isEqualTo(
-          QuestionnairePagination(listOf(QuestionnairePage(0, true), QuestionnairePage(1, true)), 0)
+          QuestionnairePagination(
+            isPaginated = true,
+            pages = listOf(QuestionnairePage(0, true), QuestionnairePage(1, true)),
+            currentPageIndex = 0
+          )
         )
     } finally {
       observer.cancel()
@@ -1358,12 +1514,591 @@ class QuestionnaireViewModelTest(
       assertThat(pagination)
         .isEqualTo(
           QuestionnairePagination(
-            listOf(
-              QuestionnairePage(0, true),
-              QuestionnairePage(1, false),
-              QuestionnairePage(2, true)
-            ),
-            2
+            isPaginated = true,
+            pages =
+              listOf(
+                QuestionnairePage(0, true),
+                QuestionnairePage(1, false),
+                QuestionnairePage(2, true)
+              ),
+            currentPageIndex = 2
+          )
+        )
+    } finally {
+      observer.cancel()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      observer.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun `should allow user to move forward using prior entry-mode`() = runBlocking {
+    val entryModeExtension =
+      Extension().apply {
+        url = EXTENSION_ENTRY_MODE_URL
+        setValue(StringType("prior-edit"))
+      }
+    val questionnaire =
+      Questionnaire().apply {
+        addExtension(entryModeExtension)
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 1"
+              }
+            )
+          }
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 2"
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+    var pagination: QuestionnairePagination? = null
+    val observer =
+      launch(Dispatchers.Main) {
+        viewModel.questionnaireStateFlow.collect { pagination = it.pagination }
+      }
+    try {
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      viewModel.goToNextPage()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+
+      assertThat(questionnaire.entryMode).isEqualTo(EntryMode.PRIOR_EDIT)
+      assertThat(pagination)
+        .isEqualTo(
+          QuestionnairePagination(
+            isPaginated = true,
+            pages = viewModel.pages!!,
+            currentPageIndex = 1
+          )
+        )
+    } finally {
+      observer.cancel()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      observer.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun `should allow user to move forward and back using prior entry-mode`() = runBlocking {
+    val entryModeExtension =
+      Extension().apply {
+        url = EXTENSION_ENTRY_MODE_URL
+        setValue(StringType("prior-edit"))
+      }
+    val questionnaire =
+      Questionnaire().apply {
+        addExtension(entryModeExtension)
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 1"
+              }
+            )
+          }
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 2"
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+    var pagination: QuestionnairePagination? = null
+    val observer =
+      launch(Dispatchers.Main) {
+        viewModel.questionnaireStateFlow.collect { pagination = it.pagination }
+      }
+    try {
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      viewModel.goToNextPage()
+      viewModel.goToPreviousPage()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+
+      assertThat(questionnaire.entryMode).isEqualTo(EntryMode.PRIOR_EDIT)
+      assertThat(pagination)
+        .isEqualTo(
+          QuestionnairePagination(
+            isPaginated = true,
+            pages = viewModel.pages!!,
+            currentPageIndex = 0
+          )
+        )
+    } finally {
+      observer.cancel()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      observer.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun `should not allow user to move forward using prior entry-mode`() = runBlocking {
+    val entryModeExtension =
+      Extension().apply {
+        url = EXTENSION_ENTRY_MODE_URL
+        setValue(StringType("prior-edit"))
+      }
+    val questionnaire =
+      Questionnaire().apply {
+        addExtension(entryModeExtension)
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                required = true
+              }
+            )
+          }
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+    var pagination: QuestionnairePagination? = null
+    val observer =
+      launch(Dispatchers.Main) {
+        viewModel.questionnaireStateFlow.collect { pagination = it.pagination }
+      }
+    try {
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      viewModel.goToNextPage()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+
+      assertThat(pagination)
+        .isEqualTo(
+          QuestionnairePagination(
+            isPaginated = true,
+            pages = viewModel.pages!!,
+            currentPageIndex = 0
+          )
+        )
+    } finally {
+      observer.cancel()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      observer.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun `should allow user to move forward using random entry-mode`() = runBlocking {
+    val entryModeExtension =
+      Extension().apply {
+        url = EXTENSION_ENTRY_MODE_URL
+        setValue(StringType("random"))
+      }
+    val questionnaire =
+      Questionnaire().apply {
+        addExtension(entryModeExtension)
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 1"
+              }
+            )
+          }
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 2"
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+    viewModel.goToNextPage()
+
+    assertThat(questionnaire.entryMode).isEqualTo(EntryMode.RANDOM)
+    assertTrue(viewModel.currentPageIndexFlow.value == viewModel.pages?.last()?.index)
+  }
+
+  @Test
+  fun `should allow user to move forward and back using random entry-mode`() = runBlocking {
+    val entryModeExtension =
+      Extension().apply {
+        url = EXTENSION_ENTRY_MODE_URL
+        setValue(StringType("random"))
+      }
+    val questionnaire =
+      Questionnaire().apply {
+        addExtension(entryModeExtension)
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 1"
+              }
+            )
+          }
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 2"
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+    viewModel.goToNextPage()
+    viewModel.goToPreviousPage()
+
+    assertThat(questionnaire.entryMode).isEqualTo(EntryMode.RANDOM)
+    assertTrue(viewModel.currentPageIndexFlow.value == viewModel.pages?.first()?.index)
+  }
+
+  @Test
+  fun `should allow user to move forward when no entry-mode is defined`() = runBlocking {
+    val questionnaire =
+      Questionnaire().apply {
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 1"
+              }
+            )
+          }
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 2"
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+    viewModel.goToNextPage()
+
+    assertThat(viewModel.entryMode).isEqualTo(EntryMode.RANDOM)
+    assertTrue(viewModel.currentPageIndexFlow.value == viewModel.pages?.last()?.index)
+  }
+
+  @Test
+  fun `should allow user to move forward and back when no entry-mode is defined`() = runBlocking {
+    val questionnaire =
+      Questionnaire().apply {
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 1"
+              }
+            )
+          }
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 2"
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+    viewModel.goToNextPage()
+    viewModel.goToPreviousPage()
+
+    assertThat(viewModel.entryMode).isEqualTo(EntryMode.RANDOM)
+    assertTrue(viewModel.currentPageIndexFlow.value == viewModel.pages?.first()?.index)
+  }
+
+  @Test
+  fun `should allow user to move forward only using sequential entry-mode`() = runBlocking {
+    val entryModeExtension =
+      Extension().apply {
+        url = EXTENSION_ENTRY_MODE_URL
+        setValue(StringType("sequential"))
+      }
+    val questionnaire =
+      Questionnaire().apply {
+        addExtension(entryModeExtension)
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 1"
+              }
+            )
+          }
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 2"
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+    var pagination: QuestionnairePagination? = null
+    val observer =
+      launch(Dispatchers.Main) {
+        viewModel.questionnaireStateFlow.collect { pagination = it.pagination }
+      }
+    try {
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      viewModel.goToNextPage()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+
+      assertThat(questionnaire.entryMode).isEqualTo(EntryMode.SEQUENTIAL)
+      assertThat(pagination)
+        .isEqualTo(
+          QuestionnairePagination(
+            isPaginated = true,
+            pages = viewModel.pages!!,
+            currentPageIndex = 1
+          )
+        )
+    } finally {
+      observer.cancel()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      observer.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun `should not allow user to move forward using sequential entry-mode`() = runBlocking {
+    val entryModeExtension =
+      Extension().apply {
+        url = EXTENSION_ENTRY_MODE_URL
+        setValue(StringType("sequential"))
+      }
+    val questionnaire =
+      Questionnaire().apply {
+        addExtension(entryModeExtension)
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                required = true
+              }
+            )
+          }
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+    var pagination: QuestionnairePagination? = null
+    val observer =
+      launch(Dispatchers.Main) {
+        viewModel.questionnaireStateFlow.collect { pagination = it.pagination }
+      }
+    try {
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      viewModel.goToNextPage()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+
+      assertThat(pagination)
+        .isEqualTo(
+          QuestionnairePagination(
+            isPaginated = true,
+            pages = viewModel.pages!!,
+            currentPageIndex = 0
+          )
+        )
+    } finally {
+      observer.cancel()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      observer.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun `should not user to move backward only using sequential entry-mode`() = runBlocking {
+    val entryModeExtension =
+      Extension().apply {
+        url = EXTENSION_ENTRY_MODE_URL
+        setValue(StringType("sequential"))
+      }
+    val questionnaire =
+      Questionnaire().apply {
+        addExtension(entryModeExtension)
+        id = "a-questionnaire"
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 1"
+              }
+            )
+          }
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 2"
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire)
+    var pagination: QuestionnairePagination? = null
+    val observer =
+      launch(Dispatchers.Main) {
+        viewModel.questionnaireStateFlow.collect { pagination = it.pagination }
+      }
+    try {
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      viewModel.goToNextPage()
+      viewModel.goToPreviousPage()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+
+      assertThat(pagination)
+        .isEqualTo(
+          QuestionnairePagination(
+            isPaginated = true,
+            pages = viewModel.pages!!,
+            currentPageIndex = 1
           )
         )
     } finally {
@@ -1692,12 +2427,158 @@ class QuestionnaireViewModelTest(
   }
 
   @Test
+<<<<<<< HEAD
   fun questionnaireItem_calculatedExpressionExtension_shouldCalculateValue_onStart() = runBlocking {
+=======
+  fun `setShowSubmitButtonFlag() to false should not show submit button`() {
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-link-id"
+              type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            }
+          )
+        }
+      val viewModel = createQuestionnaireViewModel(questionnaire)
+      viewModel.setShowSubmitButtonFlag(false)
+      assertThat(viewModel.questionnaireStateFlow.first().pagination.showSubmitButton).isFalse()
+    }
+  }
+
+  @Test
+  fun `setShowSubmitButtonFlag() to true should show submit button`() {
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-link-id"
+              type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            }
+          )
+        }
+      val viewModel = createQuestionnaireViewModel(questionnaire)
+      viewModel.setShowSubmitButtonFlag(true)
+      assertThat(viewModel.questionnaireStateFlow.first().pagination.showSubmitButton).isTrue()
+    }
+  }
+
+  @Test
+  fun `state has review feature and submit button to true should show submit button when moved to review page`() {
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-link-id"
+              type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            }
+          )
+        }
+      val viewModel = createQuestionnaireViewModel(questionnaire, enableReviewPage = true)
+      viewModel.setShowSubmitButtonFlag(true)
+      viewModel.setReviewMode(true)
+      assertThat(viewModel.questionnaireStateFlow.first().pagination.showSubmitButton).isTrue()
+    }
+  }
+
+  @Test
+  fun `state has no review feature should not show review button`() {
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-link-id"
+              type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            }
+          )
+        }
+      val viewModel = createQuestionnaireViewModel(questionnaire, enableReviewPage = false)
+      assertThat(viewModel.questionnaireStateFlow.first().pagination.showReviewButton).isFalse()
+    }
+  }
+
+  @Test
+  fun `state has review feature should show review button`() {
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-link-id"
+              type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            }
+          )
+        }
+      val viewModel = createQuestionnaireViewModel(questionnaire, enableReviewPage = true)
+      assertThat(viewModel.questionnaireStateFlow.first().pagination.showReviewButton).isTrue()
+    }
+  }
+
+  @Test
+  fun `state has review feature and show review page first should not show review button`() {
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-link-id"
+              type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            }
+          )
+        }
+      val viewModel =
+        createQuestionnaireViewModel(
+          questionnaire,
+          enableReviewPage = true,
+          showReviewPageFirst = true
+        )
+      assertThat(viewModel.questionnaireStateFlow.first().pagination.showReviewButton).isFalse()
+    }
+  }
+
+  @Test
+  fun `state has no review feature but show review page first should not show review button`() {
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-link-id"
+              type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            }
+          )
+        }
+      val viewModel =
+        createQuestionnaireViewModel(
+          questionnaire,
+          enableReviewPage = false,
+          showReviewPageFirst = true
+        )
+      assertThat(viewModel.questionnaireStateFlow.first().pagination.showReviewButton).isFalse()
+    }
+  }
+
+  @Test
+  fun `paginated questionnaire with no review feature should not show review button when moved to next page`() =
+      runBlocking {
+>>>>>>> 8dbe52f0f980ac4205f7e45b4c4b579ecff54479
     val questionnaire =
       Questionnaire().apply {
         id = "a-questionnaire"
         addItem(
           Questionnaire.QuestionnaireItemComponent().apply {
+<<<<<<< HEAD
             linkId = "a-birthdate"
             type = Questionnaire.QuestionnaireItemType.DATE
             addExtension().apply {
@@ -1710,18 +2591,43 @@ class QuestionnaireViewModelTest(
                 }
               )
             }
+=======
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 1"
+              }
+            )
+>>>>>>> 8dbe52f0f980ac4205f7e45b4c4b579ecff54479
           }
         )
         addItem(
           Questionnaire.QuestionnaireItemComponent().apply {
+<<<<<<< HEAD
             linkId = "a-age-years"
             type = Questionnaire.QuestionnaireItemType.QUANTITY
             addInitial(
               Questionnaire.QuestionnaireItemInitialComponent(Quantity.fromUcum("1", "year"))
+=======
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 2"
+              }
+>>>>>>> 8dbe52f0f980ac4205f7e45b4c4b579ecff54479
             )
           }
         )
       }
+<<<<<<< HEAD
 
     val viewModel = createQuestionnaireViewModel(questionnaire)
 
@@ -1751,12 +2657,36 @@ class QuestionnaireViewModelTest(
 
   @Test
   fun questionnaireItem_calculatedExpressionExtension_shouldCalculateValue_onChange() =
+=======
+    val viewModel = createQuestionnaireViewModel(questionnaire, enableReviewPage = false)
+    var pagination: QuestionnairePagination? = null
+    val observer =
+      launch(Dispatchers.Main) {
+        viewModel.questionnaireStateFlow.collect { pagination = it.pagination }
+      }
+    try {
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      viewModel.goToNextPage()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+
+      assertThat(pagination?.showReviewButton).isFalse()
+    } finally {
+      observer.cancel()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      observer.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun `paginated questionnaire with review feature should show review button when moved to next page`() =
+>>>>>>> 8dbe52f0f980ac4205f7e45b4c4b579ecff54479
       runBlocking {
     val questionnaire =
       Questionnaire().apply {
         id = "a-questionnaire"
         addItem(
           Questionnaire.QuestionnaireItemComponent().apply {
+<<<<<<< HEAD
             linkId = "a-birthdate"
             type = Questionnaire.QuestionnaireItemType.DATE
             addExtension().apply {
@@ -1930,11 +2860,97 @@ class QuestionnaireViewModelTest(
       .isEqualTo(
         "a-birthdate and a-age-years have cyclic dependency in calculated-expression extension"
       )
+=======
+            linkId = "page1"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page1-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 1"
+              }
+            )
+          }
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "page2"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            addExtension(paginationExtension)
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "page2-1"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                text = "Question on page 2"
+              }
+            )
+          }
+        )
+      }
+    val viewModel = createQuestionnaireViewModel(questionnaire, enableReviewPage = true)
+    var pagination: QuestionnairePagination? = null
+    val observer =
+      launch(Dispatchers.Main) {
+        viewModel.questionnaireStateFlow.collect { pagination = it.pagination }
+      }
+    try {
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      viewModel.goToNextPage()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+
+      assertThat(pagination?.showReviewButton).isTrue()
+    } finally {
+      observer.cancel()
+      ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      observer.cancelAndJoin()
+    }
+  }
+
+  @Test
+  fun `toggle review mode to false should show review button`() {
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-link-id"
+              type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            }
+          )
+        }
+      val viewModel = createQuestionnaireViewModel(questionnaire, enableReviewPage = true)
+      viewModel.setReviewMode(false)
+      assertThat(viewModel.questionnaireStateFlow.first().pagination.showReviewButton).isTrue()
+    }
+  }
+
+  @Test
+  fun `toggle review mode to true should not show review button`() {
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-link-id"
+              type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            }
+          )
+        }
+      val viewModel = createQuestionnaireViewModel(questionnaire, enableReviewPage = true)
+      viewModel.setReviewMode(true)
+      assertThat(viewModel.questionnaireStateFlow.first().pagination.showReviewButton).isFalse()
+    }
+>>>>>>> 8dbe52f0f980ac4205f7e45b4c4b579ecff54479
   }
 
   private fun createQuestionnaireViewModel(
     questionnaire: Questionnaire,
-    questionnaireResponse: QuestionnaireResponse? = null
+    questionnaireResponse: QuestionnaireResponse? = null,
+    enableReviewPage: Boolean = false,
+    showReviewPageFirst: Boolean = false
   ): QuestionnaireViewModel {
     if (questionnaireSource == QuestionnaireSource.STRING) {
       state.set(EXTRA_QUESTIONNAIRE_JSON_STRING, printer.encodeResourceToString(questionnaire))
@@ -1966,7 +2982,8 @@ class QuestionnaireViewModelTest(
           .registerInputStream(questionnaireResponseUri, questionnaireResponseFile.inputStream())
       }
     }
-
+    enableReviewPage.let { state.set(EXTRA_ENABLE_REVIEW_PAGE, it) }
+    showReviewPageFirst.let { state.set(EXTRA_SHOW_REVIEW_PAGE_FIRST, it) }
     return QuestionnaireViewModel(context, state)
   }
 
