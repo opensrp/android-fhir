@@ -26,6 +26,8 @@ import ca.uhn.fhir.context.FhirContext
 import ca.uhn.fhir.context.FhirVersionEnum
 import ca.uhn.fhir.parser.IParser
 import com.google.android.fhir.datacapture.enablement.EnablementEvaluator
+import com.google.android.fhir.datacapture.fhirpath.ExpressionEvaluator.detectExpressionCyclicDependency
+import com.google.android.fhir.datacapture.fhirpath.ExpressionEvaluator.evaluateCalculatedExpressions
 import com.google.android.fhir.datacapture.validation.NotValidated
 import com.google.android.fhir.datacapture.validation.QuestionnaireResponseItemValidator
 import com.google.android.fhir.datacapture.validation.QuestionnaireResponseValidator.checkQuestionnaireResponse
@@ -46,13 +48,13 @@ import timber.log.Timber
 
 internal class QuestionnaireViewModel(application: Application, state: SavedStateHandle) :
   AndroidViewModel(application) {
-
+  
   private val parser: IParser by lazy { FhirContext.forCached(FhirVersionEnum.R4).newJsonParser() }
-
+  
   /** The current questionnaire as questions are being answered. */
   internal val questionnaire: Questionnaire
   private lateinit var currentPageItems: List<QuestionnaireItemViewItem>
-
+  
   init {
     questionnaire =
       when {
@@ -60,7 +62,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
           if (state.contains(QuestionnaireFragment.EXTRA_QUESTIONNAIRE_JSON_STRING)) {
             Timber.w(
               "Both EXTRA_QUESTIONNAIRE_JSON_URI & EXTRA_QUESTIONNAIRE_JSON_STRING are provided. " +
-                "EXTRA_QUESTIONNAIRE_JSON_URI takes precedence."
+                      "EXTRA_QUESTIONNAIRE_JSON_URI takes precedence."
             )
           }
           val uri: Uri = state[QuestionnaireFragment.EXTRA_QUESTIONNAIRE_JSON_URI]!!
@@ -77,13 +79,13 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
           )
       }
   }
-
+  
   @VisibleForTesting
   val entryMode: EntryMode by lazy { questionnaire.entryMode ?: EntryMode.RANDOM }
-
+  
   /** The current questionnaire response as questions are being answered. */
   private val questionnaireResponse: QuestionnaireResponse
-
+  
   /**
    * True if the user has tapped the next/previous pagination buttons on the current page. This is
    * needed to avoid spewing validation errors before any questions are answered.
@@ -95,13 +97,13 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
         if (state.contains(QuestionnaireFragment.EXTRA_QUESTIONNAIRE_RESPONSE_JSON_STRING)) {
           Timber.w(
             "Both EXTRA_QUESTIONNAIRE_RESPONSE_JSON_URI & EXTRA_QUESTIONNAIRE_RESPONSE_JSON_STRING are provided. " +
-              "EXTRA_QUESTIONNAIRE_RESPONSE_JSON_URI takes precedence."
+                    "EXTRA_QUESTIONNAIRE_RESPONSE_JSON_URI takes precedence."
           )
         }
         val uri: Uri = state[QuestionnaireFragment.EXTRA_QUESTIONNAIRE_RESPONSE_JSON_URI]!!
         questionnaireResponse =
           parser.parseResource(application.contentResolver.openInputStream(uri))
-            as QuestionnaireResponse
+                  as QuestionnaireResponse
         checkQuestionnaireResponse(questionnaire, questionnaireResponse)
       }
       state.contains(QuestionnaireFragment.EXTRA_QUESTIONNAIRE_RESPONSE_JSON_STRING) -> {
@@ -124,14 +126,14 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       }
     }
   }
-
+  
   /**
    * The pre-order traversal trace of the items in the [QuestionnaireResponse]. This essentially
    * represents the order in which all items are displayed in the UI.
    */
   private val questionnaireResponseItemPreOrderList =
     mutableListOf<QuestionnaireResponse.QuestionnaireResponseItemComponent>()
-
+  
   init {
     /**
      * Adds all items in the [QuestionnaireResponse] to the pre-order list. Note that each
@@ -149,16 +151,16 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
         }
       }
     }
-
+    
     for (item in questionnaireResponse.item) {
       buildPreOrderList(item)
     }
   }
-
+  
   /** The map from each item in the [Questionnaire] to its parent. */
   private var questionnaireItemParentMap:
-    Map<Questionnaire.QuestionnaireItemComponent, Questionnaire.QuestionnaireItemComponent>
-
+          Map<Questionnaire.QuestionnaireItemComponent, Questionnaire.QuestionnaireItemComponent>
+  
   init {
     /** Adds each child-parent pair in the [Questionnaire] to the parent map. */
     fun buildParentList(
@@ -170,21 +172,21 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
         buildParentList(child, questionnaireItemToParentMap)
       }
     }
-
+    
     questionnaireItemParentMap = buildMap {
       for (item in questionnaire.item) {
         buildParentList(item, this)
       }
     }
   }
-
+  
   /** The map from each item in the [QuestionnaireResponse] to its parent. */
   private val questionnaireResponseItemParentMap =
     mutableMapOf<
-      QuestionnaireResponse.QuestionnaireResponseItemComponent,
-      QuestionnaireResponse.QuestionnaireResponseItemComponent
-    >()
-
+            QuestionnaireResponse.QuestionnaireResponseItemComponent,
+            QuestionnaireResponse.QuestionnaireResponseItemComponent
+            >()
+  
   init {
     /** Adds each child-parent pair in the [QuestionnaireResponse] to the parent map. */
     fun buildParentList(item: QuestionnaireResponse.QuestionnaireResponseItemComponent) {
@@ -193,45 +195,45 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
         buildParentList(child)
       }
     }
-
+    
     for (item in questionnaireResponse.item) {
       buildParentList(item)
     }
   }
-
+  
   /** The pages of the questionnaire, or null if the questionnaire is not paginated. */
   @VisibleForTesting var pages: List<QuestionnairePage>? = questionnaire.getInitialPages()
-
+  
   /**
    * The flow representing the index of the current page, or null if the questionnaire is not
    * paginated.
    */
   @VisibleForTesting val currentPageIndexFlow = MutableStateFlow(getInitialPageIndex())
-
+  
   /** Flag to support fragment for review-feature */
   private val enableReviewPage: Boolean
-
+  
   init {
     enableReviewPage = state[QuestionnaireFragment.EXTRA_ENABLE_REVIEW_PAGE] ?: false
   }
-
+  
   /** Flag to open fragment first in data-collection or review-mode */
   private val showReviewPageFirst: Boolean
-
+  
   init {
     showReviewPageFirst =
       enableReviewPage && state[QuestionnaireFragment.EXTRA_SHOW_REVIEW_PAGE_FIRST] ?: false
   }
-
+  
   /** Tracks modifications in order to update the UI. */
   private val modificationCount = MutableStateFlow(0)
-
+  
   /** Toggles review mode. */
   private val reviewFlow = MutableStateFlow(showReviewPageFirst)
-
+  
   /** Flag to show/hide submit button. */
   private var showSubmitButtonFlag = false
-
+  
   /**
    * Contains [QuestionnaireResponse.QuestionnaireResponseItemComponent]s that have been modified by
    * the user. [QuestionnaireResponse.QuestionnaireResponseItemComponent]s that have not been
@@ -240,7 +242,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
    */
   private val modifiedQuestionnaireResponseItemSet =
     mutableSetOf<QuestionnaireResponse.QuestionnaireResponseItemComponent>()
-
+  
   /**
    * Callback function to update the view model after the answer(s) to a question have been changed.
    * This is passed to the [QuestionnaireItemViewItem] in its constructor so that it can invoke this
@@ -258,25 +260,26 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
    * new answers to the question.
    */
   private val answersChangedCallback:
-    (
-      Questionnaire.QuestionnaireItemComponent,
-      QuestionnaireResponse.QuestionnaireResponseItemComponent,
-      List<QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent>
-    ) -> Unit =
+            (
+    Questionnaire.QuestionnaireItemComponent,
+    QuestionnaireResponse.QuestionnaireResponseItemComponent,
+    List<QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent>) -> Unit =
     { questionnaireItem, questionnaireResponseItem, answers ->
       // TODO(jingtang10): update the questionnaire response item pre-order list and the parent map
       questionnaireResponseItem.answer = answers.toList()
       if (questionnaireItem.hasNestedItemsWithinAnswers) {
         questionnaireResponseItem.addNestedItemsToAnswer(questionnaireItem)
       }
-
       modifiedQuestionnaireResponseItemSet.add(questionnaireResponseItem)
+      
+      runCalculations(questionnaireItem)
+      
       modificationCount.update { it + 1 }
     }
-
+  
   private val answerValueSetMap =
     mutableMapOf<String, List<Questionnaire.QuestionnaireItemAnswerOptionComponent>>()
-
+  
   /**
    * Returns current [QuestionnaireResponse] captured by the UI which includes answers of enabled
    * questions.
@@ -286,7 +289,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       item = getEnabledResponseItems(this@QuestionnaireViewModel.questionnaire.item, item)
     }
   }
-
+  
   internal fun goToPreviousPage() {
     when (entryMode) {
       EntryMode.PRIOR_EDIT,
@@ -303,7 +306,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       }
     }
   }
-
+  
   internal fun goToNextPage() {
     when (entryMode) {
       EntryMode.PRIOR_EDIT,
@@ -314,7 +317,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
           isPaginationButtonPressed = true
           modificationCount.update { it + 1 }
         }
-
+        
         if (currentPageItems.all { it.validationResult is Valid }) {
           isPaginationButtonPressed = false
           val nextPageIndex =
@@ -331,46 +334,74 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       }
     }
   }
-
+  
   internal fun setReviewMode(reviewModeFlag: Boolean) {
     reviewFlow.value = reviewModeFlag
   }
-
+  
   internal fun setShowSubmitButtonFlag(showSubmitButton: Boolean) {
     showSubmitButtonFlag = showSubmitButton
   }
-
+  
   /** [QuestionnaireState] to be displayed in the UI. */
   internal val questionnaireStateFlow: Flow<QuestionnaireState> =
     combine(modificationCount, currentPageIndexFlow, reviewFlow) { _, pagination, reviewFlow ->
-        if (reviewFlow) {
-          getQuestionnaireState(
-            questionnaireItemList = questionnaire.item,
-            questionnaireResponseItemList = questionnaireResponse.item,
-            currentPageIndex = null,
-            reviewMode = reviewFlow
-          )
-        } else {
-          getQuestionnaireState(
-            questionnaireItemList = questionnaire.item,
-            questionnaireResponseItemList = questionnaireResponse.item,
-            currentPageIndex = pagination,
-            reviewMode = reviewFlow
-          )
-        }
+      if (reviewFlow) {
+        getQuestionnaireState(
+          questionnaireItemList = questionnaire.item,
+          questionnaireResponseItemList = questionnaireResponse.item,
+          currentPageIndex = null,
+          reviewMode = reviewFlow
+        )
+      } else {
+        getQuestionnaireState(
+          questionnaireItemList = questionnaire.item,
+          questionnaireResponseItemList = questionnaireResponse.item,
+          currentPageIndex = pagination,
+          reviewMode = reviewFlow
+        )
       }
+    }
       .stateIn(
         viewModelScope,
         SharingStarted.Lazily,
         initialValue =
-          getQuestionnaireState(
-            questionnaireItemList = questionnaire.item,
-            questionnaireResponseItemList = questionnaireResponse.item,
-            currentPageIndex = getInitialPageIndex(),
-            reviewMode = enableReviewPage
-          )
+        getQuestionnaireState(
+          questionnaireItemList = questionnaire.item,
+          questionnaireResponseItemList = questionnaireResponse.item,
+          currentPageIndex = getInitialPageIndex(),
+          reviewMode = enableReviewPage
+        )
+          .also { detectExpressionCyclicDependency(questionnaire.item) }
+          .also { questionnaire.item.flattened().forEach { runCalculations(it) } }
       )
-
+  
+  fun runCalculations(updatedQuestionnaireItem: Questionnaire.QuestionnaireItemComponent) {
+    evaluateCalculatedExpressions(
+      updatedQuestionnaireItem,
+      questionnaire,
+      questionnaireResponse,
+      modifiedQuestionnaireResponseItemSet,
+      questionnaireItemParentMap
+    )
+      .forEach { (questionnaireItem, calculatedAnswers) ->
+        // update all response item with updated values
+        questionnaireResponseItemPreOrderList
+          .filter { it.linkId == questionnaireItem.linkId }
+          .forEach { questionnaireResponseItem ->
+            // update and notify only if new answer has changed to prevent any event loop
+            if (questionnaireResponseItem.answer.hasDifferentAnswerSet(calculatedAnswers)) {
+              questionnaireResponseItem.answer =
+                calculatedAnswers.map {
+                  QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
+                    value = it
+                  }
+                }
+            }
+          }
+      }
+  }
+  
   @PublishedApi
   internal suspend fun resolveAnswerValueSet(
     uri: String
@@ -379,14 +410,14 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
     if (answerValueSetMap.contains(uri)) {
       return answerValueSetMap[uri]!!
     }
-
+    
     val options =
       if (uri.startsWith("#")) {
         questionnaire.contained
           .firstOrNull { resource ->
             resource.id.equals(uri) &&
-              resource.resourceType == ResourceType.ValueSet &&
-              (resource as ValueSet).hasExpansion()
+                    resource.resourceType == ResourceType.ValueSet &&
+                    (resource as ValueSet).hasExpansion()
           }
           ?.let { resource ->
             val valueSet = resource as ValueSet
@@ -410,7 +441,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
     answerValueSetMap[uri] = options
     return options
   }
-
+  
   /**
    * Traverses through the list of questionnaire items, the list of questionnaire response items and
    * the list of items in the questionnaire response answer list and populates
@@ -425,36 +456,36 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
     currentPageIndex: Int?,
     reviewMode: Boolean
   ): QuestionnaireState {
-
+    
     val showReviewButton =
       enableReviewPage &&
-        !reviewFlow.value &&
-        (currentPageIndex == null ||
-          !QuestionnairePagination(pages = pages!!, currentPageIndex = currentPageIndex)
-            .hasNextPage)
-
+              !reviewFlow.value &&
+              (currentPageIndex == null ||
+                      !QuestionnairePagination(pages = pages!!, currentPageIndex = currentPageIndex)
+                        .hasNextPage)
+    
     val showSubmitButton =
       showSubmitButtonFlag &&
-        !showReviewButton &&
-        (currentPageIndex == null ||
-          !QuestionnairePagination(pages = pages!!, currentPageIndex = currentPageIndex)
-            .hasNextPage)
-
+              !showReviewButton &&
+              (currentPageIndex == null ||
+                      !QuestionnairePagination(pages = pages!!, currentPageIndex = currentPageIndex)
+                        .hasNextPage)
+    
     if (currentPageIndex == null) {
       // Single-page questionnaire
       return QuestionnaireState(
         items = getQuestionnaireItemViewItems(questionnaireItemList, questionnaireResponseItemList),
         pagination =
-          QuestionnairePagination(false, emptyList(), -1, showSubmitButton, showReviewButton),
+        QuestionnairePagination(false, emptyList(), -1, showSubmitButton, showReviewButton),
         reviewMode = reviewMode
       )
     }
-
+    
     // Paginated questionnaire
     pages =
       questionnaireItemList.zip(questionnaireResponseItemList).mapIndexed {
-        index,
-        (questionnaireItem, questionnaireResponseItem) ->
+          index,
+          (questionnaireItem, questionnaireResponseItem) ->
         QuestionnairePage(
           index,
           EnablementEvaluator.evaluate(
@@ -468,22 +499,22 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       }
     return QuestionnaireState(
       items =
-        getQuestionnaireItemViewItems(
-          questionnaireItemList[currentPageIndex],
-          questionnaireResponseItemList[currentPageIndex]
-        ),
+      getQuestionnaireItemViewItems(
+        questionnaireItemList[currentPageIndex],
+        questionnaireResponseItemList[currentPageIndex]
+      ),
       pagination =
-        QuestionnairePagination(
-          true,
-          pages!!,
-          currentPageIndex,
-          showSubmitButton,
-          showReviewButton
-        ),
+      QuestionnairePagination(
+        true,
+        pages!!,
+        currentPageIndex,
+        showSubmitButton,
+        showReviewButton
+      ),
       reviewMode = reviewMode
     )
   }
-
+  
   /**
    * Returns the list of [QuestionnaireItemViewItem]s generated for the questionnaire items and
    * questionnaire response items.
@@ -500,17 +531,17 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
         // If there is an enabled questionnaire response available then we use that. Or else we
         // just use an empty questionnaireResponse Item
         if (responseIndex < questionnaireResponseItemList.size &&
-            questionnaireItem.linkId == questionnaireResponseItemList[responseIndex].linkId
+          questionnaireItem.linkId == questionnaireResponseItemList[responseIndex].linkId
         ) {
           questionnaireResponseItem = questionnaireResponseItemList[responseIndex]
           responseIndex += 1
         }
-
+        
         getQuestionnaireItemViewItems(questionnaireItem, questionnaireResponseItem)
       }
       .toList()
   }
-
+  
   /**
    * Returns the list of [QuestionnaireItemViewItem]s generated for the questionnaire item and
    * questionnaire response item.
@@ -527,14 +558,14 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       ) { questionnaireResponseItem, linkId ->
         findEnableWhenQuestionnaireResponseItem(questionnaireResponseItem, linkId)
       }
-
+    
     if (!enabled || questionnaireItem.isHidden) {
       return emptyList()
     }
-
+    
     val validationResult =
       if (modifiedQuestionnaireResponseItemSet.contains(questionnaireResponseItem) ||
-          isPaginationButtonPressed
+        isPaginationButtonPressed
       ) {
         QuestionnaireResponseItemValidator.validate(
           questionnaireItem,
@@ -554,25 +585,25 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
           resolveAnswerValueSet = { resolveAnswerValueSet(it) },
         )
       ) +
-        getQuestionnaireItemViewItems(
-          // If nested display item is identified as instructions or flyover, then do not create
-          // questionnaire state for it.
-          questionnaireItemList =
-            questionnaireItem.item.filterNot {
-              it.type == Questionnaire.QuestionnaireItemType.DISPLAY &&
-                (it.isInstructionsCode || it.isFlyoverCode || it.isHelpCode)
-            },
-          questionnaireResponseItemList =
-            if (questionnaireResponseItem.answer.isEmpty()) {
-              questionnaireResponseItem.item
-            } else {
-              questionnaireResponseItem.answer.first().item
-            },
-        )
+              getQuestionnaireItemViewItems(
+                // If nested display item is identified as instructions or flyover, then do not create
+                // questionnaire state for it.
+                questionnaireItemList =
+                questionnaireItem.item.filterNot {
+                  it.type == Questionnaire.QuestionnaireItemType.DISPLAY &&
+                          (it.isInstructionsCode || it.isFlyoverCode || it.isHelpCode)
+                },
+                questionnaireResponseItemList =
+                if (questionnaireResponseItem.answer.isEmpty()) {
+                  questionnaireResponseItem.item
+                } else {
+                  questionnaireResponseItem.answer.first().item
+                },
+              )
     currentPageItems = items
     return items
   }
-
+  
   private fun getEnabledResponseItems(
     questionnaireItemList: List<Questionnaire.QuestionnaireItemComponent>,
     questionnaireResponseItemList: List<QuestionnaireResponse.QuestionnaireResponseItemComponent>,
@@ -603,7 +634,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       }
       .toList()
   }
-
+  
   /**
    * Checks if this questionnaire uses pagination via the "page" extension.
    *
@@ -619,7 +650,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
     } else {
       null
     }
-
+  
   private fun Questionnaire.getInitialPages() =
     if (questionnaire.isPaginated) {
       // Assume all pages are enabled to begin with
@@ -627,7 +658,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
     } else {
       null
     }
-
+  
   /**
    * Find a questionnaire response item in [QuestionnaireResponse] with the given `linkId` starting
    * from the `origin`.
@@ -654,7 +685,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       }
       parent = questionnaireResponseItemParentMap[parent]
     }
-
+    
     // Find the nearest item preceding the origin
     val itemIndex = questionnaireResponseItemPreOrderList.indexOf(origin)
     for (index in itemIndex - 1 downTo 0) {
@@ -662,20 +693,20 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
         return questionnaireResponseItemPreOrderList[index]
       }
     }
-
+    
     // Find the nearest item succeeding the origin
     for (index in itemIndex + 1 until questionnaireResponseItemPreOrderList.size) {
       if (questionnaireResponseItemPreOrderList[index].linkId == linkId) {
         return questionnaireResponseItemPreOrderList[index]
       }
     }
-
+    
     return null
   }
 }
 
 typealias ItemToParentMap =
-  MutableMap<Questionnaire.QuestionnaireItemComponent, Questionnaire.QuestionnaireItemComponent>
+        MutableMap<Questionnaire.QuestionnaireItemComponent, Questionnaire.QuestionnaireItemComponent>
 
 /** Questionnaire state for the Fragment to consume. */
 internal data class QuestionnaireState(

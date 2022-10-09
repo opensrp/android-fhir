@@ -19,6 +19,7 @@ package com.google.android.fhir.datacapture
 import android.os.Build
 import com.google.android.fhir.datacapture.mapping.ITEM_INITIAL_EXPRESSION_URL
 import com.google.common.truth.Truth.assertThat
+import java.math.BigDecimal
 import java.util.Locale
 import org.hl7.fhir.r4.model.BooleanType
 import org.hl7.fhir.r4.model.CodeType
@@ -27,6 +28,7 @@ import org.hl7.fhir.r4.model.Coding
 import org.hl7.fhir.r4.model.Enumeration
 import org.hl7.fhir.r4.model.Expression
 import org.hl7.fhir.r4.model.Extension
+import org.hl7.fhir.r4.model.Quantity
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.StringType
 import org.hl7.fhir.r4.utils.ToolingExtensions
@@ -1060,6 +1062,37 @@ class MoreQuestionnaireItemComponentsTest {
   }
 
   @Test
+  fun calculatedExpression_shouldReturnExpression() {
+    val questionnaire =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(
+          EXTENSION_CALCULATED_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "today()"
+            this.language = "text/fhirpath"
+          }
+        )
+      }
+    assertThat(questionnaire.calculatedExpression).isNotNull()
+    assertThat(questionnaire.calculatedExpression!!.expression).isEqualTo("today()")
+  }
+
+  @Test
+  fun calculatedExpression_shouldReturnNull() {
+    val questionnaire =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(
+          ITEM_INITIAL_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "today()"
+            this.language = "text/fhirpath"
+          }
+        )
+      }
+    assertThat(questionnaire.calculatedExpression).isNull()
+  }
+
+  @Test
   fun localizedFlyoverSpanned_matchingLocale_shouldReturnFlyover() {
     val questionItemList =
       listOf(
@@ -1251,6 +1284,62 @@ class MoreQuestionnaireItemComponentsTest {
         (questionResponse.item[0].answer[0].item[0].answer[0].value as BooleanType).booleanValue()
       )
       .isEqualTo(true)
+  }
+
+  @Test
+  fun createQuestionResponseWithQuantityType_ShouldNotSetAnswer_WithValueEmpty() {
+    val question =
+      Questionnaire.QuestionnaireItemComponent(
+          StringType("age"),
+          Enumeration(
+            Questionnaire.QuestionnaireItemTypeEnumFactory(),
+            Questionnaire.QuestionnaireItemType.QUANTITY
+          )
+        )
+        .apply {
+          initial =
+            listOf(
+              Questionnaire.QuestionnaireItemInitialComponent(
+                Quantity().apply {
+                  code = "months"
+                  system = "http://unitofmeausre.org"
+                }
+              )
+            )
+        }
+
+    val questionResponse = question.createQuestionnaireResponseItem()
+
+    assertThat(questionResponse.answer).isEmpty()
+  }
+
+  @Test
+  fun createQuestionResponseWithQuantityType_ShouldSetAnswer() {
+    val question =
+      Questionnaire.QuestionnaireItemComponent(
+          StringType("age"),
+          Enumeration(
+            Questionnaire.QuestionnaireItemTypeEnumFactory(),
+            Questionnaire.QuestionnaireItemType.QUANTITY
+          )
+        )
+        .apply {
+          initial =
+            listOf(
+              Questionnaire.QuestionnaireItemInitialComponent(
+                Quantity().apply {
+                  code = "months"
+                  system = "http://unitofmeausre.org"
+                  value = BigDecimal("1")
+                }
+              )
+            )
+        }
+
+    val questionResponse = question.createQuestionnaireResponseItem()
+    val answer = questionResponse.answerFirstRep.value as Quantity
+    assertThat(answer.value).isEqualTo(BigDecimal(1))
+    assertThat(answer.code).isEqualTo("months")
   }
 
   @Test
