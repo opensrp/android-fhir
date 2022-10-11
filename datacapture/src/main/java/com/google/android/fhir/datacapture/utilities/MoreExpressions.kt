@@ -14,20 +14,15 @@
  * limitations under the License.
  */
 
-package com.google.android.fhir.datacapture.testing
+package com.google.android.fhir.datacapture.utilities
 
-import android.app.Application
-import com.google.android.fhir.datacapture.DataCaptureConfig
+import org.hl7.fhir.r4.model.Expression
 
-/** Application class when you want to test the DataCaptureConfig.Provider */
-class DataCaptureTestApplication : Application(), DataCaptureConfig.Provider {
-  var dataCaptureConfiguration: DataCaptureConfig? = null
-
-  override fun getDataCaptureConfig(): DataCaptureConfig {
-    if (dataCaptureConfiguration == null) {
-      dataCaptureConfiguration = DataCaptureConfig()
-    }
-
-    return dataCaptureConfiguration!!
-  }
-}
+/**
+ * An expression which does not refer to a specific linkId or variable and derives value using a
+ * generic expression
+ */
+internal val Expression.hasDynamicExpression
+  get() =
+    this.expression.replace(" ", "").contains("linkId='").not() ||
+      this.expression.matches(Regex(".*%\\w+.*")).not()

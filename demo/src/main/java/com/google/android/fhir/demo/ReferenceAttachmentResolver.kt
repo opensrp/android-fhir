@@ -14,20 +14,23 @@
  * limitations under the License.
  */
 
-package com.google.android.fhir.datacapture.testing
+package com.google.android.fhir.demo
 
-import android.app.Application
-import com.google.android.fhir.datacapture.DataCaptureConfig
+import android.content.Context
+import android.graphics.Bitmap
+import com.google.android.fhir.datacapture.AttachmentResolver
+import com.google.android.fhir.get
+import org.hl7.fhir.r4.model.Binary
 
-/** Application class when you want to test the DataCaptureConfig.Provider */
-class DataCaptureTestApplication : Application(), DataCaptureConfig.Provider {
-  var dataCaptureConfiguration: DataCaptureConfig? = null
+class ReferenceAttachmentResolver(val context: Context) : AttachmentResolver {
 
-  override fun getDataCaptureConfig(): DataCaptureConfig {
-    if (dataCaptureConfiguration == null) {
-      dataCaptureConfiguration = DataCaptureConfig()
+  override suspend fun resolveBinaryResource(uri: String): Binary? {
+    return uri.substringAfter("Binary/").substringBefore("/").run {
+      FhirApplication.fhirEngine(context).get(this)
     }
+  }
 
-    return dataCaptureConfiguration!!
+  override suspend fun resolveImageUrl(uri: String): Bitmap? {
+    return null
   }
 }

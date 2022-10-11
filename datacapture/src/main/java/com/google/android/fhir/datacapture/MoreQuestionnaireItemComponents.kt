@@ -16,9 +16,15 @@
 
 package com.google.android.fhir.datacapture
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.text.Spanned
+import android.util.Base64
 import androidx.core.text.HtmlCompat
 import com.google.android.fhir.getLocalizedText
+import org.hl7.fhir.r4.model.Attachment
+import org.hl7.fhir.r4.model.Binary
 import org.hl7.fhir.r4.model.BooleanType
 import org.hl7.fhir.r4.model.CodeType
 import org.hl7.fhir.r4.model.CodeableConcept
@@ -26,6 +32,7 @@ import org.hl7.fhir.r4.model.Expression
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.QuestionnaireResponse
 import org.hl7.fhir.r4.model.StringType
+import timber.log.Timber
 
 /** UI controls relevant to capturing question data. */
 internal enum class ItemControlTypes(
@@ -55,6 +62,11 @@ internal const val EXTENSION_ITEM_CONTROL_SYSTEM = "http://hl7.org/fhir/question
 
 internal const val EXTENSION_HIDDEN_URL =
   "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden"
+internal const val EXTENSION_ITEM_MEDIA =
+  "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemMedia"
+
+internal const val EXTENSION_CALCULATED_EXPRESSION_URL =
+  "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression"
 
 internal const val EXTENSION_ENTRY_FORMAT_URL =
   "http://hl7.org/fhir/StructureDefinition/entryFormat"
@@ -68,6 +80,9 @@ internal const val EXTENSION_ENABLE_WHEN_EXPRESSION_URL: String =
   "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression"
 
 internal const val EXTENSION_VARIABLE_URL = "http://hl7.org/fhir/StructureDefinition/variable"
+
+internal const val EXTENSION_CQF_CALCULATED_VALUE_URL: String =
+  "http://hl7.org/fhir/StructureDefinition/cqf-calculatedValue"
 
 internal val Questionnaire.QuestionnaireItemComponent.variableExpressions: List<Expression>
   get() =
@@ -87,8 +102,29 @@ internal fun Questionnaire.QuestionnaireItemComponent.findVariableExpression(
   return variableExpressions.find { it.name == variableName }
 }
 
-internal const val CQF_CALCULATED_EXPRESSION_URL: String =
-  "http://hl7.org/fhir/StructureDefinition/cqf-calculatedValue"
+/** Returns Calculated expression, or null */
+internal val Questionnaire.QuestionnaireItemComponent.calculatedExpression: Expression?
+  get() =
+    this.getExtensionByUrl(EXTENSION_CALCULATED_EXPRESSION_URL)?.let {
+      it.castToExpression(it.value)
+    }
+
+/** Returns list of extensions whose value is of type [Expression] */
+internal val Questionnaire.QuestionnaireItemComponent.expressionBasedExtensions
+  get() = this.extension.filter { it.value is Expression }
+
+/**
+ * Whether [item] has any expression directly referencing the current questionnaire item by link ID (e.g. if [item] has an expression `%resource.item.where(linkId='this-question')` where `this-question` is the link ID of the current questionnaire item).
+ */
+internal fun Questionnaire.QuestionnaireItemComponent.isReferencedBy(
+  item: Questionnaire.QuestionnaireItemComponent
+) =
+  item.expressionBasedExtensions.any {
+    it.castToExpression(it.value)
+      .expression
+      .replace(" ", "")
+      .contains(Regex(".*linkId='${this.linkId}'.*"))
+  }
 
 // Item control code, or null
 internal val Questionnaire.QuestionnaireItemComponent.itemControl: ItemControlTypes?
@@ -104,7 +140,7 @@ internal val Questionnaire.QuestionnaireItemComponent.itemControl: ItemControlTy
         ?.coding
         ?.firstOrNull {
           it.system == EXTENSION_ITEM_CONTROL_SYSTEM ||
-            it.system == EXTENSION_ITEM_CONTROL_SYSTEM_ANDROID_FHIR
+                  it.system == EXTENSION_ITEM_CONTROL_SYSTEM_ANDROID_FHIR
         }
         ?.code
     return ItemControlTypes.values().firstOrNull { it.extensionCode == code }
@@ -123,7 +159,7 @@ internal val Questionnaire.QuestionnaireItemComponent.choiceOrientation: ChoiceO
   get() {
     val code =
       (this.extension.firstOrNull { it.url == EXTENSION_CHOICE_ORIENTATION_URL }?.value
-          as CodeType?)
+              as CodeType?)
         ?.valueAsString
     return ChoiceOrientationTypes.values().firstOrNull { it.extensionCode == code }
   }
@@ -199,7 +235,7 @@ internal val Questionnaire.QuestionnaireItemComponent.localizedInstructionsSpann
     return item
       .firstOrNull { questionnaireItem ->
         questionnaireItem.type == Questionnaire.QuestionnaireItemType.DISPLAY &&
-          questionnaireItem.isInstructionsCode
+                questionnaireItem.isInstructionsCode
       }
       ?.localizedTextSpanned
   }
@@ -213,7 +249,7 @@ internal val Questionnaire.QuestionnaireItemComponent.localizedFlyoverSpanned: S
     item
       .firstOrNull { questionnaireItem ->
         questionnaireItem.type == Questionnaire.QuestionnaireItemType.DISPLAY &&
-          questionnaireItem.displayItemControl == DisplayItemControlType.FLYOVER
+                questionnaireItem.displayItemControl == DisplayItemControlType.FLYOVER
       }
       ?.localizedTextSpanned
 
@@ -261,7 +297,7 @@ internal val Questionnaire.QuestionnaireItemComponent.isInstructionsCode: Boolea
       Questionnaire.QuestionnaireItemType.DISPLAY -> {
         val codeableConcept =
           this.extension.firstOrNull { it.url == EXTENSION_DISPLAY_CATEGORY_URL }?.value
-            as CodeableConcept?
+                  as CodeableConcept?
         val code =
           codeableConcept
             ?.coding
@@ -299,14 +335,14 @@ internal val Questionnaire.QuestionnaireItemComponent.isFlyoverCode: Boolean
  * https://www.hl7.org/fhir/questionnaireresponse.html#notes for more details.
  */
 fun Questionnaire.QuestionnaireItemComponent.createQuestionnaireResponseItem():
-  QuestionnaireResponse.QuestionnaireResponseItemComponent {
+        QuestionnaireResponse.QuestionnaireResponseItemComponent {
   return QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
     linkId = this@createQuestionnaireResponseItem.linkId
     answer = createQuestionnaireResponseItemAnswers()
     if (hasNestedItemsWithinAnswers && answer.isNotEmpty()) {
       this.addNestedItemsToAnswer(this@createQuestionnaireResponseItem)
     } else if (this@createQuestionnaireResponseItem.type ==
-        Questionnaire.QuestionnaireItemType.GROUP
+      Questionnaire.QuestionnaireItemType.GROUP
     ) {
       this@createQuestionnaireResponseItem.item.forEach {
         this.addItem(it.createQuestionnaireResponseItem())
@@ -328,25 +364,30 @@ val Questionnaire.QuestionnaireItemComponent.enableWhenExpression: Expression?
  * value.
  */
 private fun Questionnaire.QuestionnaireItemComponent.createQuestionnaireResponseItemAnswers():
-  MutableList<QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent>? {
-  if (initial.isEmpty()) {
+        MutableList<QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent>? {
+  // https://build.fhir.org/ig/HL7/sdc/behavior.html#initial
+  // quantity given as initial without value is for unit reference purpose only. Answer conversion
+  // not needed
+  if (initial.isEmpty() ||
+    (initialFirstRep.hasValueQuantity() && initialFirstRep.valueQuantity.value == null)
+  ) {
     return null
   }
-
+  
   if (type == Questionnaire.QuestionnaireItemType.GROUP ||
-      type == Questionnaire.QuestionnaireItemType.DISPLAY
+    type == Questionnaire.QuestionnaireItemType.DISPLAY
   ) {
     throw IllegalArgumentException(
       "Questionnaire item $linkId has initial value(s) and is a group or display item. See rule que-8 at https://www.hl7.org/fhir/questionnaire-definitions.html#Questionnaire.item.initial."
     )
   }
-
+  
   if (initial.size > 1 && !repeats) {
     throw IllegalArgumentException(
       "Questionnaire item $linkId can only have multiple initial values for repeating items. See rule que-13 at https://www.hl7.org/fhir/questionnaire-definitions.html#Questionnaire.item.initial."
     )
   }
-
+  
   return mutableListOf(
     QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
       value = initial[0].value
@@ -369,6 +410,15 @@ fun QuestionnaireResponse.QuestionnaireResponseItemComponent.addNestedItemsToAns
 }
 
 /**
+ * Flatten a nested list of [Questionnaire.QuestionnaireItemComponent] recursively and returns a
+ * flat list of all items into list embedded at any level
+ */
+fun List<Questionnaire.QuestionnaireItemComponent>.flattened():
+        List<Questionnaire.QuestionnaireItemComponent> {
+  return this + this.flatMap { it.item.flattened() }
+}
+
+/**
  * Creates a list of [QuestionnaireResponse.QuestionnaireResponseItemComponent]s from the nested
  * items in the [Questionnaire.QuestionnaireItemComponent].
  *
@@ -377,3 +427,57 @@ fun QuestionnaireResponse.QuestionnaireResponseItemComponent.addNestedItemsToAns
  */
 private inline fun Questionnaire.QuestionnaireItemComponent.getNestedQuestionnaireResponseItems() =
   item.map { it.createQuestionnaireResponseItem() }
+
+/** The Attachment defined in the [EXTENSION_ITEM_MEDIA] extension where applicable */
+internal val Questionnaire.QuestionnaireItemComponent.itemMedia: Attachment?
+  get() {
+    val extension = this.extension.singleOrNull { it.url == EXTENSION_ITEM_MEDIA }
+    return if (extension != null) extension.value as Attachment else null
+  }
+
+/** Whether the Attachment has a [Attachment.contentType] for an image */
+val Attachment.isImage: Boolean
+  get() = this.hasContentType() && contentType.startsWith("image")
+
+/** Whether the Binary has a [Binary.contentType] for an image */
+fun Binary.isImage(): Boolean = this.hasContentType() && contentType.startsWith("image")
+
+/** Decodes the Bitmap from the Base64 encoded string in [Bitmap.data] */
+fun Binary.getBitmap(): Bitmap? {
+  return if (isImage()) {
+    Base64.decode(this.dataElement.valueAsString, Base64.DEFAULT).let { byteArray ->
+      BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
+    }
+  } else {
+    Timber.e("Binary does not have a contentType image")
+    null
+  }
+}
+
+/**
+ * Returns the Bitmap defined in the attachment as inline Base64 encoded image, Binary resource
+ * defined in the url or externally hosted image. Inline Base64 encoded image requires to have
+ * contentType starting with image
+ */
+suspend fun Attachment.fetchBitmap(context: Context): Bitmap? {
+  // Attachment's with data inline need the contentType property
+  // Conversion to Bitmap should only be made if the contentType is image
+  if (data != null) {
+    if (isImage) {
+      return BitmapFactory.decodeByteArray(data, 0, data.size)
+    }
+    Timber.e("Attachment of contentType ${this.contentType} is not supported")
+    return null
+  } else if (url != null && (url.startsWith("https") || url.startsWith("http"))) {
+    // Points to a Binary resource on a FHIR compliant server
+    val attachmentResolver = DataCapture.getConfiguration(context).attachmentResolver
+    return if (url.contains("/Binary/")) {
+      attachmentResolver?.run { resolveBinaryResource(url)?.getBitmap() }
+    } else {
+      attachmentResolver?.resolveImageUrl(url)
+    }
+  }
+
+  Timber.e("Could not determine the Bitmap in Attachment $id")
+  return null
+}

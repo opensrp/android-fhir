@@ -17,8 +17,10 @@
 package com.google.android.fhir.datacapture
 
 import android.app.Application
+import android.graphics.Bitmap
 import com.google.android.fhir.datacapture.DataCaptureConfig.Provider
 import org.hl7.fhir.r4.context.SimpleWorkerContext
+import org.hl7.fhir.r4.model.Binary
 import org.hl7.fhir.r4.model.Coding
 import org.hl7.fhir.r4.model.StructureMap
 import org.hl7.fhir.utilities.npm.NpmPackage
@@ -45,7 +47,13 @@ data class DataCaptureConfig(
    * should try to include the smallest [NpmPackage] possible that contains only the resources
    * needed by [StructureMap]s used by the client app.
    */
-  var npmPackage: NpmPackage? = null
+  var npmPackage: NpmPackage? = null,
+
+  /**
+   * Used to resolve/process [org.hl7.fhir.r4.model.Attachment] to it's binary equivalent. The
+   * attachment's can either have the data or a URL
+   */
+  var attachmentResolver: AttachmentResolver? = null
 ) {
 
   internal val simpleWorkerContext: SimpleWorkerContext by lazy {
@@ -74,4 +82,11 @@ data class DataCaptureConfig(
  */
 interface ExternalAnswerValueSetResolver {
   suspend fun resolve(uri: String): List<Coding>
+}
+
+interface AttachmentResolver {
+
+  suspend fun resolveBinaryResource(uri: String): Binary?
+
+  suspend fun resolveImageUrl(uri: String): Bitmap?
 }
