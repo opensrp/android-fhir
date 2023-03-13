@@ -4,9 +4,10 @@ plugins {
   id(Plugins.BuildPlugins.navSafeArgs)
 }
 
+configureRuler()
+
 android {
   compileSdk = Sdk.compileSdk
-  buildToolsVersion = Plugins.Versions.buildTools
 
   defaultConfig {
     applicationId = Releases.Catalog.applicationId
@@ -16,8 +17,6 @@ android {
     versionName = Releases.Catalog.versionName
 
     testInstrumentationRunner = Dependencies.androidJunitRunner
-    // Required when setting minSdkVersion to 20 or lower
-    multiDexEnabled = true
   }
 
   buildFeatures { viewBinding = true }
@@ -32,18 +31,18 @@ android {
     // Flag to enable support for the new language APIs
     // See https://developer.android.com/studio/write/java8-support
     isCoreLibraryDesugaringEnabled = true
-    // Sets Java compatibility to Java 8
-    // See https://developer.android.com/studio/write/java8-support
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+
+    sourceCompatibility = Java.sourceCompatibility
+    targetCompatibility = Java.targetCompatibility
   }
+
   packagingOptions {
-    resources.excludes.addAll(listOf("META-INF/ASL-2.0.txt", "META-INF/LGPL-3.0.txt"))
+    resources.excludes.addAll(
+      listOf("META-INF/ASL2.0", "META-INF/ASL-2.0.txt", "META-INF/LGPL-3.0.txt")
+    )
   }
-  kotlinOptions {
-    // See https://developer.android.com/studio/write/java8-support
-    jvmTarget = "1.8"
-  }
+
+  kotlinOptions { jvmTarget = Java.kotlinJvmTarget.toString() }
 }
 
 dependencies {
@@ -62,6 +61,7 @@ dependencies {
   implementation(Dependencies.Navigation.navUiKtx)
 
   implementation(project(path = ":datacapture"))
+  implementation(project(path = ":contrib:barcode"))
 
   testImplementation(Dependencies.junit)
 }

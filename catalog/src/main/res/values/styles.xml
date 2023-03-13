@@ -18,28 +18,101 @@
 
     <!-- The custom theme for the questionnaires in this application. -->
     <style name="Theme.MyQuestionnaire" parent="Theme.Questionnaire">
+
+        <item name="colorPrimary">@color/primary_blue_40</item>
+        <item name="colorOnPrimary">@color/onPrimary_blue_100</item>
         <item
-            name="groupHeaderTextAppearanceQuestionnaire"
-        >@style/TextAppearance.MyQuestionnaire.GroupHeader
+            name="colorPrimaryContainer"
+        >@color/primaryContainer_blue_90</item>
+        <item
+            name="colorOnPrimaryContainer"
+        >@color/onPrimaryContainer_blue_10</item>
+
+        <item name="colorSecondary">@color/secondary_blue_40</item>
+        <item name="colorOnSecondary">@color/onSecondary_blue_100</item>
+        <item
+            name="colorSecondaryContainer"
+        >@color/secondaryContainer_blue_90</item>
+        <item
+            name="colorOnSecondaryContainer"
+        >@color/onSecondaryContainer_blue_10</item>
+
+        <item name="colorTertiary">@color/tertiary_green_40</item>
+        <item name="colorOnTertiary">@color/onTertiary_green_100</item>
+        <item
+            name="colorTertiaryContainer"
+        >@color/tertiaryContainer_green_90</item>
+        <item
+            name="colorOnTertiaryContainer"
+        >@color/onTertiaryContainer_green_10</item>
+
+        <item name="colorError">@color/error_red_40</item>
+        <item name="colorErrorContainer">@color/errorContainer_red_100</item>
+        <item name="colorOnError">@color/onError_red_90</item>
+        <item name="colorOnErrorContainer">@color/onErrorContainer_red_10</item>
+
+        <item
+            name="android:colorBackground"
+        >@color/background_neutral_100</item>
+        <item name="colorOnBackground">@color/onBackground_neutral_10</item>
+
+        <item name="colorSurface">@color/surface_neutral_100</item>
+        <item name="colorOnSurface">@color/onSurface_neutral_10</item>
+
+        <item
+            name="colorSurfaceVariant"
+        >@color/surfaceVariant_neutral_variant_90</item>
+        <item
+            name="colorOnSurfaceVariant"
+        >@color/onSurfaceVariant_neutral_variant_30</item>
+
+        <item name="colorOutline">@color/outline_neutral_variant_50</item>
+
+    </style>
+
+    <style name="Theme.MyQuestionnaire.DefaultLayout">
+        <item
+            name="questionnaireSubmitButtonStyle"
+        >@style/App.Layout.SubmitButtonStyle
         </item>
     </style>
+
+    <style name="Theme.MyQuestionnaire.PaginatedLayout">
+        <item name="questionnaireQuestionTextStyle">
+            @style/TextAppearance.Material3.HeadlineMedium
+        </item>
+        <item
+            name="questionnaireSubmitButtonStyle"
+        >@style/App.Layout.SubmitButtonStyle
+        </item>
+    </style>
+
+    <style name="Theme.MyQuestionnaire.PaginatedLayout.Component">
+        <item
+            name="questionnaireSubmitButtonStyle"
+        >@style/App.Component.SubmitButtonStyle
+        </item>
+    </style>
+
     <style
-        name="TextAppearance.MyQuestionnaire.GroupHeader"
-        parent="TextAppearance.MaterialComponents.Headline6"
+        name="App.Layout.SubmitButtonStyle"
+        parent="Questionnaire.SubmitButtonStyle"
     >
-        <item name="android:textColor">@color/purple_700</item>
+        <item name="android:visibility">visible</item>
     </style>
-    <style name="itemTextViewStyle">
-        <item name="android:fontFamily">sans-serif</item>
-        <item name="android:letterSpacing">0.01</item>
-        <item name="android:textAppearance">?attr/textAppearanceBody2</item>
-        <item name="android:textColor">@color/grey_800</item>
-        <item name="android:textSize">14sp</item>
-        <item name="android:typeface">normal</item>
+
+    <style
+        name="App.Component.SubmitButtonStyle"
+        parent="Questionnaire.SubmitButtonStyle"
+    >
+        <item name="android:visibility">gone</item>
     </style>
-    <style name="ToolbarStyle">
-        <item name="android:fontFamily">sans-serif</item>
-        <item name="android:textColor">@color/toolbar_text_color</item>
-        <item name="android:textSize">18sp</item>
+
+    <style
+        name="Widget.App.MaterialComponents.Button"
+        parent="Widget.Material3.Button"
+    >
+        <item name="cornerRadius">100dp</item>
     </style>
+
 </resources>

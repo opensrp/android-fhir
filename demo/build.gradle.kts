@@ -5,6 +5,8 @@ plugins {
   id(Plugins.BuildPlugins.navSafeArgs)
 }
 
+configureRuler()
+
 android {
   compileSdk = Sdk.compileSdk
   defaultConfig {
@@ -14,9 +16,6 @@ android {
     versionCode = Releases.Demo.versionCode
     versionName = Releases.Demo.versionName
     testInstrumentationRunner = Dependencies.androidJunitRunner
-    // Required when setting minSdkVersion to 20 or lower
-    // See https://developer.android.com/studio/write/java8-support
-    multiDexEnabled = true
   }
   buildTypes {
     getByName("release") {
@@ -29,22 +28,13 @@ android {
     // Flag to enable support for the new language APIs
     // See https://developer.android.com/studio/write/java8-support
     isCoreLibraryDesugaringEnabled = true
-    // Sets Java compatibility to Java 8
-    // See https://developer.android.com/studio/write/java8-support
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+
+    sourceCompatibility = Java.sourceCompatibility
+    targetCompatibility = Java.targetCompatibility
   }
+  kotlinOptions { jvmTarget = Java.kotlinJvmTarget.toString() }
   packagingOptions {
     resources.excludes.addAll(listOf("META-INF/ASL-2.0.txt", "META-INF/LGPL-3.0.txt"))
-  }
-  // See https://developer.android.com/studio/write/java8-support
-  kotlinOptions { jvmTarget = JavaVersion.VERSION_1_8.toString() }
-}
-
-configurations {
-  all {
-    exclude(module = "json")
-    exclude(module = "xpp3")
   }
 }
 
@@ -68,13 +58,12 @@ dependencies {
   implementation(Dependencies.Lifecycle.viewModelKtx)
   implementation(Dependencies.Navigation.navFragmentKtx)
   implementation(Dependencies.Navigation.navUiKtx)
-  implementation(Dependencies.Retrofit.coreRetrofit)
-  implementation(Dependencies.Retrofit.gsonConverter)
-  implementation(Dependencies.Retrofit.retrofitMock)
-  implementation(Dependencies.httpInterceptor)
   implementation(Dependencies.material)
+  implementation(Dependencies.timber)
+  implementation(project(":datacapture")) {
+    exclude(group = Dependencies.androidFhirGroup, module = Dependencies.androidFhirEngineModule)
+  }
   implementation(project(":engine"))
-  implementation(project(":datacapture"))
 
   testImplementation(Dependencies.junit)
 }

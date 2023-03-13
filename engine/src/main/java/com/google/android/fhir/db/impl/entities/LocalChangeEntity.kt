@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,13 +51,14 @@ import androidx.room.PrimaryKey
  * ] For resource that is fully synced with server this table should not have any rows.
  */
 @Entity(indices = [Index(value = ["resourceType", "resourceId"])])
-data class LocalChangeEntity(
+internal data class LocalChangeEntity(
   @PrimaryKey(autoGenerate = true) val id: Long,
   val resourceType: String,
   val resourceId: String,
   val timestamp: String = "",
   val type: Type,
-  val payload: String
+  val payload: String,
+  val versionId: String? = null
 ) {
   enum class Type(val value: Int) {
     INSERT(1), // create a new resource. payload is the entire resource json.

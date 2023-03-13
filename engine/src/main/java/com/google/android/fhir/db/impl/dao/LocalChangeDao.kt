@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.google.android.fhir.db.impl.dao
 
-import android.util.Log
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
@@ -24,11 +23,14 @@ import androidx.room.Transaction
 import ca.uhn.fhir.parser.IParser
 import com.google.android.fhir.db.impl.entities.LocalChangeEntity
 import com.google.android.fhir.db.impl.entities.LocalChangeEntity.Type
+import com.google.android.fhir.db.impl.entities.ResourceEntity
 import com.google.android.fhir.logicalId
 import com.google.android.fhir.toTimeZoneString
+import com.google.android.fhir.versionId
 import java.util.Date
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
+import timber.log.Timber
 
 /**
  * Dao for local changes made to a resource. One row in LocalChangeEntity corresponds to one change
@@ -61,12 +63,13 @@ internal abstract class LocalChangeDao {
         resourceId = resourceId,
         timestamp = timestamp,
         type = Type.INSERT,
-        payload = resourceString
+        payload = resourceString,
+        versionId = resource.versionId
       )
     )
   }
 
-  suspend fun addUpdate(oldResource: Resource, resource: Resource) {
+  suspend fun addUpdate(oldEntity: ResourceEntity, resource: Resource) {
     val resourceId = resource.logicalId
     val resourceType = resource.resourceType
     val timestamp = Date().toTimeZoneString()
@@ -78,10 +81,14 @@ internal abstract class LocalChangeDao {
         "Unexpected DELETE when updating $resourceType/$resourceId. UPDATE failed."
       )
     }
-    val jsonDiff = LocalChangeUtils.diff(iParser, oldResource, resource)
+    val jsonDiff =
+      LocalChangeUtils.diff(
+        iParser,
+        iParser.parseResource(oldEntity.serializedResource) as Resource,
+        resource
+      )
     if (jsonDiff.length() == 0) {
-      Log.i(
-        "LocalChangeDao",
+      Timber.i(
         "New resource ${resource.resourceType}/${resource.id} is same as old resource. " +
           "Not inserting UPDATE LocalChange."
       )
@@ -94,12 +101,13 @@ internal abstract class LocalChangeDao {
         resourceId = resourceId,
         timestamp = timestamp,
         type = Type.UPDATE,
-        payload = jsonDiff.toString()
+        payload = jsonDiff.toString(),
+        versionId = oldEntity.versionId
       )
     )
   }
 
-  suspend fun addDelete(resourceId: String, resourceType: ResourceType) {
+  suspend fun addDelete(resourceId: String, resourceType: ResourceType, remoteVersionId: String?) {
     val timestamp = Date().toTimeZoneString()
     addLocalChange(
       LocalChangeEntity(
@@ -108,7 +116,8 @@ internal abstract class LocalChangeDao {
         resourceId = resourceId,
         timestamp = timestamp,
         type = Type.DELETE,
-        payload = ""
+        payload = "",
+        versionId = remoteVersionId
       )
     )
   }
@@ -155,9 +164,35 @@ internal abstract class LocalChangeDao {
   )
   abstract suspend fun discardLocalChanges(id: Long)
 
-  suspend fun discardLocalChanges(token: LocalChangeToken) {
+  @Transaction
+  open suspend fun discardLocalChanges(token: LocalChangeToken) {
     token.ids.forEach { discardLocalChanges(it) }
   }
+
+  @Query(
+    """
+        DELETE FROM LocalChangeEntity
+        WHERE resourceId = (:resourceId)
+        AND resourceType = :resourceType
+    """
+  )
+  abstract suspend fun discardLocalChanges(resourceId: String, resourceType: ResourceType)
+
+  suspend fun discardLocalChanges(resources: List<Resource>) {
+    resources.forEach { discardLocalChanges(it.logicalId, it.resourceType) }
+  }
+
+  @Query(
+    """
+        SELECT *
+        FROM LocalChangeEntity
+        WHERE resourceId = :resourceId AND resourceType = :resourceType
+    """
+  )
+  abstract suspend fun getLocalChanges(
+    resourceType: ResourceType,
+    resourceId: String
+  ): List<LocalChangeEntity>
 
   class InvalidLocalChangeException(message: String?) : Exception(message)
 }

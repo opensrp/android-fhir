@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,13 @@
 package com.google.android.fhir.datacapture
 
 import android.app.Application
+import android.graphics.Bitmap
+import com.google.android.fhir.datacapture.DataCaptureConfig.Provider
+import com.google.android.fhir.datacapture.QuestionnaireFragment.QuestionnaireItemViewHolderFactoryMatcher
+import com.google.android.fhir.datacapture.QuestionnaireFragment.QuestionnaireItemViewHolderFactoryMatchersProvider
 import org.hl7.fhir.r4.context.SimpleWorkerContext
 import org.hl7.fhir.r4.model.Coding
+import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.StructureMap
 import org.hl7.fhir.utilities.npm.NpmPackage
 
@@ -44,7 +49,25 @@ data class DataCaptureConfig(
    * should try to include the smallest [NpmPackage] possible that contains only the resources
    * needed by [StructureMap]s used by the client app.
    */
-  var npmPackage: NpmPackage? = null
+  var npmPackage: NpmPackage? = null,
+
+  /**
+   * A [XFhirQueryResolver] may be set by the client to resolve x-fhir-query for the library. See
+   * https://build.fhir.org/ig/HL7/sdc/expressions.html#fhirquery for more details.
+   */
+  var xFhirQueryResolver: XFhirQueryResolver? = null,
+
+  /** Resolves a URL to the media binary content. */
+  var urlResolver: UrlResolver? = null,
+
+  /**
+   * A [QuestionnaireItemViewHolderFactoryMatchersProviderFactory] may be set by the client to
+   * provide [QuestionnaireItemViewHolderFactoryMatcher]s to add custom questionnaire components or
+   * override the behaviour of existing components in the sdc.
+   */
+  var questionnaireItemViewHolderFactoryMatchersProviderFactory:
+    QuestionnaireItemViewHolderFactoryMatchersProviderFactory? =
+    null
 ) {
 
   internal val simpleWorkerContext: SimpleWorkerContext by lazy {
@@ -53,9 +76,9 @@ data class DataCaptureConfig(
 
   /**
    * A class that can provide the [DataCaptureConfig] for the Structured Data Capture Library. To do
-   * this, implement the {@link DataCaptureConfig.Provider} interface on your [Application] class.
-   * You should provide the same configuration throughout the lifecycle of your application. The
-   * library may cache the configuration and different configurations will be ignored.
+   * this, implement the [DataCaptureConfig.Provider] interface on your [Application] class. You
+   * should provide the same configuration throughout the lifecycle of your application. The library
+   * may cache the configuration and different configurations will be ignored.
    */
   interface Provider {
     fun getDataCaptureConfig(): DataCaptureConfig
@@ -73,4 +96,37 @@ data class DataCaptureConfig(
  */
 interface ExternalAnswerValueSetResolver {
   suspend fun resolve(uri: String): List<Coding>
+}
+
+/**
+ * Resolves resources based on the provided xFhir query. This allows the library to resolve
+ * x-fhir-query answer expressions.
+ *
+ * NOTE: The result of the resolution may be cached to improve performance. In other words, the
+ * resolver may be called only once after which the Resources may be used multiple times in the UI.
+ */
+fun interface XFhirQueryResolver {
+  suspend fun resolve(xFhirQuery: String): List<Resource>
+}
+
+/**
+ * Resolves media content based on the provided URL, allowing the library to render media content in
+ * its UI.
+ */
+interface UrlResolver {
+  suspend fun resolveBitmapUrl(url: String): Bitmap?
+}
+
+/**
+ * Factory to create [QuestionnaireItemViewHolderFactoryMatchersProvider] for the
+ * [QuestionnaireFragment] to provide [List] of [QuestionnaireItemViewHolderFactoryMatcher]. The
+ * developers may provide the factory to the library via [DataCaptureConfig] to add custom
+ * questionnaire components or override the behaviour of existing components in the sdc.
+ *
+ * See the
+ * [developer guide](https://github.com/google/android-fhir/wiki/SDCL:-Customize-how-a-Questionnaire-is-displayed#custom-questionnaire-components)
+ * for more information.
+ */
+fun interface QuestionnaireItemViewHolderFactoryMatchersProviderFactory {
+  fun get(provider: String): QuestionnaireItemViewHolderFactoryMatchersProvider
 }

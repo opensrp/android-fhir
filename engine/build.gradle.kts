@@ -1,4 +1,5 @@
-import Releases.useApache2License
+import codegen.GenerateSourcesTask
+import java.net.URL
 
 plugins {
   id(Plugins.BuildPlugins.androidLib)
@@ -6,33 +7,27 @@ plugins {
   id(Plugins.BuildPlugins.kotlinKapt)
   id(Plugins.BuildPlugins.mavenPublish)
   jacoco
+  id(Plugins.BuildPlugins.dokka).version(Plugins.Versions.dokka)
 }
 
-afterEvaluate {
-  publishing {
-    publications {
-      register("release", MavenPublication::class) {
-        from(components["release"])
-        groupId = Releases.groupId
-        artifactId = Releases.Engine.artifactId
-        version = Releases.Engine.version
-        // Also publish source code for developers' convenience
-        artifact(
-          tasks.create<Jar>("androidSourcesJar") {
-            archiveClassifier.set("sources")
-            from(android.sourceSets.getByName("main").java.srcDirs)
-          }
-        )
-        pom {
-          name.set(Releases.Engine.name)
-          useApache2License()
-        }
-      }
-    }
-  }
-}
+publishArtifact(Releases.Engine)
 
 createJacocoTestReportTask()
+
+val generateSourcesTask =
+  project.tasks.register("generateSearchParamsTask", GenerateSourcesTask::class) {
+    srcOutputDir.set(project.layout.buildDirectory.dir("gen/main"))
+    testOutputDir.set(project.layout.buildDirectory.dir("gen/test"))
+  }
+
+kotlin {
+  sourceSets {
+    val main by getting
+    val test by getting
+    main.kotlin.srcDirs(generateSourcesTask.map { it.srcOutputDir })
+    test.kotlin.srcDirs(generateSourcesTask.map { it.testOutputDir })
+  }
+}
 
 android {
   compileSdk = Sdk.compileSdk
@@ -42,9 +37,6 @@ android {
     testInstrumentationRunner = Dependencies.androidJunitRunner
     // need to specify this to prevent junit runner from going deep into our dependencies
     testInstrumentationRunnerArguments["package"] = "com.google.android.fhir"
-    // Required when setting minSdkVersion to 20 or lower
-    // See https://developer.android.com/studio/write/java8-support
-    multiDexEnabled = true
   }
 
   sourceSets {
@@ -70,21 +62,20 @@ android {
     // Flag to enable support for the new language APIs
     // See https = //developer.android.com/studio/write/java8-support
     isCoreLibraryDesugaringEnabled = true
-    // Sets Java compatibility to Java 8
-    // See https = //developer.android.com/studio/write/java8-support
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = Java.sourceCompatibility
+    targetCompatibility = Java.targetCompatibility
   }
 
   packagingOptions {
     resources.excludes.addAll(listOf("META-INF/ASL-2.0.txt", "META-INF/LGPL-3.0.txt"))
   }
 
-  // See https = //developer.android.com/studio/write/java8-support
-  kotlinOptions { jvmTarget = JavaVersion.VERSION_1_8.toString() }
+  kotlinOptions { jvmTarget = Java.kotlinJvmTarget.toString() }
 
   configureJacocoTestOptions()
 }
+
+afterEvaluate { configureFirebaseTestLab() }
 
 configurations {
   all {
@@ -92,23 +83,19 @@ configurations {
     exclude(module = "xpp3")
     exclude(group = "net.sf.saxon", module = "Saxon-HE")
     exclude(module = "hamcrest-all")
-    exclude(module = "jaxb-impl")
-    exclude(module = "jaxb-core")
     exclude(module = "jakarta.activation-api")
     exclude(module = "javax.activation")
     exclude(module = "jakarta.xml.bind-api")
-    // TODO =  the following line can be removed from the next CQL engine release.
-    exclude(module = "hapi-fhir-jpaserver-base")
   }
 }
 
 dependencies {
-  androidTestImplementation(Dependencies.junit)
-  androidTestImplementation(Dependencies.truth)
   androidTestImplementation(Dependencies.AndroidxTest.core)
   androidTestImplementation(Dependencies.AndroidxTest.extJunitKtx)
   androidTestImplementation(Dependencies.AndroidxTest.runner)
   androidTestImplementation(Dependencies.AndroidxTest.workTestingRuntimeKtx)
+  androidTestImplementation(Dependencies.junit)
+  androidTestImplementation(Dependencies.truth)
 
   api(Dependencies.HapiFhir.structuresR4) { exclude(module = "junit") }
 
@@ -123,24 +110,51 @@ dependencies {
   }
   implementation(Dependencies.Kotlin.stdlib)
   implementation(Dependencies.Lifecycle.liveDataKtx)
+  implementation(Dependencies.Retrofit.coreRetrofit)
   implementation(Dependencies.Room.ktx)
   implementation(Dependencies.Room.runtime)
   implementation(Dependencies.androidFhirCommon)
   implementation(Dependencies.guava)
+  implementation(Dependencies.httpInterceptor)
   implementation(Dependencies.jsonToolsPatch)
   implementation(Dependencies.sqlcipher)
+  implementation(Dependencies.timber)
 
   kapt(Dependencies.Room.compiler)
 
-  testImplementation(Dependencies.junit)
-  testImplementation(Dependencies.mockitoKotlin)
-  testImplementation(Dependencies.robolectric)
-  testImplementation(Dependencies.truth)
-  testImplementation(Dependencies.AndroidxTest.core)
   testImplementation(Dependencies.AndroidxTest.archCore)
+  testImplementation(Dependencies.AndroidxTest.core)
   testImplementation(Dependencies.AndroidxTest.workTestingRuntimeKtx)
   testImplementation(Dependencies.Kotlin.kotlinCoroutinesTest)
+  testImplementation(Dependencies.junit)
+  testImplementation(Dependencies.mockitoInline)
+  testImplementation(Dependencies.mockitoKotlin)
+  testImplementation(Dependencies.mockWebServer)
+  testImplementation(Dependencies.robolectric)
+  testImplementation(Dependencies.truth)
 }
 
-// Generate SearchParameterRepositoryGenerated.kt.
-tasks.getByName("build") { dependsOn(":codegen:runCodeGenerator") }
+tasks.dokkaHtml.configure {
+  outputDirectory.set(file("../docs/${Releases.Engine.artifactId}/${Releases.Engine.version}"))
+  suppressInheritedMembers.set(true)
+  dokkaSourceSets {
+    named("main") {
+      moduleName.set(Releases.Engine.artifactId)
+      moduleVersion.set(Releases.Engine.version)
+      noAndroidSdkLink.set(false)
+      sourceLink {
+        localDirectory.set(file("src/main/java"))
+        remoteUrl.set(
+          URL("https://github.com/google/android-fhir/tree/master/engine/src/main/java")
+        )
+        remoteLineSuffix.set("#L")
+      }
+      externalDocumentationLink {
+        url.set(URL("https://hapifhir.io/hapi-fhir/apidocs/hapi-fhir-structures-r4/"))
+        packageListUrl.set(
+          URL("https://hapifhir.io/hapi-fhir/apidocs/hapi-fhir-structures-r4/element-list")
+        )
+      }
+    }
+  }
+}

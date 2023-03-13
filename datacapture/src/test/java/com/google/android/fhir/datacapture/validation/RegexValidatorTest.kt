@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ import org.hl7.fhir.r4.model.IntegerType
 import org.hl7.fhir.r4.model.PrimitiveType
 import org.hl7.fhir.r4.model.Quantity
 import org.hl7.fhir.r4.model.Questionnaire
-import org.hl7.fhir.r4.model.QuestionnaireResponse
 import org.hl7.fhir.r4.model.QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent
 import org.hl7.fhir.r4.model.StringType
 import org.hl7.fhir.r4.model.TimeType
@@ -159,16 +158,12 @@ class RegexValidatorTest {
         )
       }
     val response =
-      QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
-        addAnswer(
-          QuestionnaireResponseItemAnswerComponent().apply { this.value = Quantity(1234567.89) }
-        )
-      }
+      QuestionnaireResponseItemAnswerComponent().apply { this.value = Quantity(1234567.89) }
 
     val validationResult = RegexValidator.validate(requirement, response, context)
 
     assertThat(validationResult.isValid).isTrue()
-    assertThat(validationResult.message.isNullOrBlank()).isTrue()
+    assertThat(validationResult.errorMessage.isNullOrBlank()).isTrue()
   }
 
   private companion object {
@@ -180,10 +175,10 @@ class RegexValidatorTest {
       val testComponent = createRegexQuestionnaireTestItem(regex, value)
 
       val validationResult =
-        RegexValidator.validate(testComponent.requirement, testComponent.response, context)
+        RegexValidator.validate(testComponent.requirement, testComponent.answer, context)
 
       assertThat(validationResult.isValid).isTrue()
-      assertThat(validationResult.message.isNullOrBlank()).isTrue()
+      assertThat(validationResult.errorMessage.isNullOrBlank()).isTrue()
     }
 
     @JvmStatic
@@ -191,10 +186,10 @@ class RegexValidatorTest {
       val testComponent = createRegexQuestionnaireTestItem(regex, value)
 
       val validationResult =
-        RegexValidator.validate(testComponent.requirement, testComponent.response, context)
+        RegexValidator.validate(testComponent.requirement, testComponent.answer, context)
 
       assertThat(validationResult.isValid).isFalse()
-      assertThat(validationResult.message)
+      assertThat(validationResult.errorMessage)
         .isEqualTo("The answer doesn't match regular expression: $regex")
     }
 
@@ -212,11 +207,8 @@ class RegexValidatorTest {
             }
           )
         }
-      val questionnaireResponseItem =
-        QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
-          addAnswer(QuestionnaireResponseItemAnswerComponent().apply { this.value = value })
-        }
-      return QuestionnaireTestItem(questionnaireItem, questionnaireResponseItem)
+      val answer = QuestionnaireResponseItemAnswerComponent().apply { this.value = value }
+      return QuestionnaireTestItem(questionnaireItem, answer)
     }
   }
 }

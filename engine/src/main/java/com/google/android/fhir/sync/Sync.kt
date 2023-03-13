@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,92 +17,127 @@
 package com.google.android.fhir.sync
 
 import android.content.Context
+import androidx.lifecycle.asFlow
 import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequest
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import com.google.android.fhir.FhirEngine
+import androidx.work.hasKeyWithValueOfType
+import com.google.android.fhir.DatastoreUtil
+import com.google.android.fhir.OffsetDateTimeTypeAdapter
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import java.time.OffsetDateTime
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.flatMapConcat
+import kotlinx.coroutines.flow.mapNotNull
 
 object Sync {
-  fun basicSyncJob(context: Context): SyncJob {
-    return SyncJobImpl(context)
-  }
+  val gson: Gson =
+    GsonBuilder()
+      .registerTypeAdapter(OffsetDateTime::class.java, OffsetDateTimeTypeAdapter().nullSafe())
+      .create()
 
   /**
-   * Does a one time sync based on [ResourceSyncParams]. Returns a [Result] that tells caller
-   * whether process was Success or Failure. In case of failure, caller needs to take care of the
-   * retry
-   */
-  suspend fun oneTimeSync(
-    context: Context,
-    fhirEngine: FhirEngine,
-    dataSource: DataSource,
-    resourceSyncParams: ResourceSyncParams
-  ): Result {
-    return FhirSynchronizer(context, fhirEngine, dataSource, resourceSyncParams).synchronize()
-  }
-
-  /**
-   * Starts a one time sync based on [FhirSyncWorker]. In case of a failure, [RetryConfiguration]
-   * will guide the retry mechanism. Caller can set [retryConfiguration] to [null] to stop retry.
+   * Starts a one time sync job based on [FhirSyncWorker].
+   *
+   * Use the returned [Flow] to get updates of the sync job. Alternatively, use [getWorkerInfo] with
+   * the same [FhirSyncWorker] to retrieve the status of the job.
+   *
+   * @param retryConfiguration configuration to guide the retry mechanism, or `null` to stop retry.
+   * @return a [Flow] of [SyncJobStatus]
    */
   inline fun <reified W : FhirSyncWorker> oneTimeSync(
     context: Context,
     retryConfiguration: RetryConfiguration? = defaultRetryConfiguration
-  ) {
+  ): Flow<SyncJobStatus> {
+    val flow = getWorkerInfo<W>(context)
     WorkManager.getInstance(context)
       .enqueueUniqueWork(
-        SyncWorkType.DOWNLOAD.workerName,
+        W::class.java.name,
         ExistingWorkPolicy.KEEP,
-        createOneTimeWorkRequest<W>(retryConfiguration)
+        createOneTimeWorkRequest(retryConfiguration, W::class.java)
       )
+    return flow
   }
+
   /**
-   * Starts a periodic sync based on [FhirSyncWorker]. It takes [PeriodicSyncConfiguration] to
-   * determine the sync frequency and [RetryConfiguration] to guide the retry mechanism. Caller can
-   * set [retryConfiguration] to [null] to stop retry.
+   * Starts a periodic sync job based on [FhirSyncWorker].
+   *
+   * Use the returned [Flow] to get updates of the sync job. Alternatively, use [getWorkerInfo] with
+   * the same [FhirSyncWorker] to retrieve the status of the job.
+   *
+   * @param periodicSyncConfiguration configuration to determine the sync frequency and retry
+   * mechanism
+   * @return a [Flow] of [SyncJobStatus]
    */
+  @ExperimentalCoroutinesApi
   inline fun <reified W : FhirSyncWorker> periodicSync(
     context: Context,
-    periodicSyncConfiguration: PeriodicSyncConfiguration,
-  ) {
-
+    periodicSyncConfiguration: PeriodicSyncConfiguration
+  ): Flow<SyncJobStatus> {
+    val flow = getWorkerInfo<W>(context)
     WorkManager.getInstance(context)
       .enqueueUniquePeriodicWork(
-        SyncWorkType.DOWNLOAD.workerName,
+        W::class.java.name,
         ExistingPeriodicWorkPolicy.KEEP,
-        createPeriodicWorkRequest<W>(periodicSyncConfiguration)
+        createPeriodicWorkRequest(periodicSyncConfiguration, W::class.java)
       )
+    return flow
+  }
+
+  /** Gets the worker info for the [FhirSyncWorker] */
+  inline fun <reified W : FhirSyncWorker> getWorkerInfo(context: Context) =
+    WorkManager.getInstance(context)
+      .getWorkInfosForUniqueWorkLiveData(W::class.java.name)
+      .asFlow()
+      .flatMapConcat { it.asFlow() }
+      .mapNotNull { workInfo ->
+        workInfo.progress
+          .takeIf { it.keyValueMap.isNotEmpty() && it.hasKeyWithValueOfType<String>("StateType") }
+          ?.let {
+            val state = it.getString("StateType")!!
+            val stateData = it.getString("State")
+            gson.fromJson(stateData, Class.forName(state)) as SyncJobStatus
+          }
+      }
+
+  /** Gets the timestamp of the last sync job. */
+  fun getLastSyncTimestamp(context: Context): OffsetDateTime? {
+    return DatastoreUtil(context).readLastSyncTimestamp()
   }
 
   @PublishedApi
-  internal inline fun <reified W : FhirSyncWorker> createOneTimeWorkRequest(
-    retryConfiguration: RetryConfiguration?
+  internal inline fun <W : FhirSyncWorker> createOneTimeWorkRequest(
+    retryConfiguration: RetryConfiguration?,
+    clazz: Class<W>
   ): OneTimeWorkRequest {
-    val oneTimeWorkRequest = OneTimeWorkRequestBuilder<W>()
+    val oneTimeWorkRequestBuilder = OneTimeWorkRequest.Builder(clazz)
     retryConfiguration?.let {
-      oneTimeWorkRequest.setBackoffCriteria(
+      oneTimeWorkRequestBuilder.setBackoffCriteria(
         it.backoffCriteria.backoffPolicy,
         it.backoffCriteria.backoffDelay,
         it.backoffCriteria.timeUnit
       )
-      oneTimeWorkRequest.setInputData(
+      oneTimeWorkRequestBuilder.setInputData(
         Data.Builder().putInt(MAX_RETRIES_ALLOWED, it.maxRetries).build()
       )
     }
-    return oneTimeWorkRequest.build()
+    return oneTimeWorkRequestBuilder.build()
   }
 
   @PublishedApi
-  internal inline fun <reified W : FhirSyncWorker> createPeriodicWorkRequest(
-    periodicSyncConfiguration: PeriodicSyncConfiguration
+  internal inline fun <W : FhirSyncWorker> createPeriodicWorkRequest(
+    periodicSyncConfiguration: PeriodicSyncConfiguration,
+    clazz: Class<W>
   ): PeriodicWorkRequest {
     val periodicWorkRequestBuilder =
-      PeriodicWorkRequestBuilder<W>(
+      PeriodicWorkRequest.Builder(
+          clazz,
           periodicSyncConfiguration.repeat.interval,
           periodicSyncConfiguration.repeat.timeUnit
         )
@@ -120,11 +155,4 @@ object Sync {
     }
     return periodicWorkRequestBuilder.build()
   }
-}
-
-/** Defines different types of synchronisation workers: download and upload */
-enum class SyncWorkType(val workerName: String) {
-  DOWNLOAD_UPLOAD("fhir-engine-download-upload-worker"),
-  DOWNLOAD("download"),
-  UPLOAD("upload")
 }

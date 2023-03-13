@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +18,15 @@ package com.google.android.fhir.datacapture.views
 
 import android.widget.FrameLayout
 import android.widget.TextView
-import androidx.core.view.isVisible
 import androidx.test.annotation.UiThreadTest
 import androidx.test.ext.junit.rules.activityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.fhir.datacapture.R
 import com.google.android.fhir.datacapture.TestActivity
+import com.google.android.fhir.datacapture.validation.Invalid
+import com.google.android.fhir.datacapture.validation.NotValidated
+import com.google.android.fhir.datacapture.views.factories.QuestionnaireItemDialogSelectViewHolderFactory
+import com.google.android.fhir.datacapture.views.factories.QuestionnaireItemViewHolder
 import com.google.android.material.textfield.TextInputLayout
 import com.google.common.truth.Truth.assertThat
 import org.hl7.fhir.r4.model.Coding
@@ -38,43 +41,14 @@ class QuestionnaireItemMultiSelectHolderFactoryInstrumentedTest {
   @get:Rule val rule = activityScenarioRule<TestActivity>()
 
   @Test
-  fun shouldShowPrefixText() = withViewHolder { holder ->
-    holder.bind(
-      QuestionnaireItemViewItem(
-        Questionnaire.QuestionnaireItemComponent().apply {
-          repeats = true
-          prefix = "Prefix?"
-          linkId = "1"
-        },
-        QuestionnaireResponse.QuestionnaireResponseItemComponent()
-      ) {}
-    )
-
-    assertThat(holder.itemView.findViewById<TextView>(R.id.prefix_text_view).isVisible).isTrue()
-    assertThat(holder.itemView.findViewById<TextView>(R.id.prefix_text_view).text.toString())
-      .isEqualTo("Prefix?")
-  }
-
-  @Test
-  fun shouldHidePrefixText() = withViewHolder { holder ->
-    holder.bind(
-      QuestionnaireItemViewItem(
-        Questionnaire.QuestionnaireItemComponent().apply {
-          repeats = true
-          prefix = ""
-          linkId = "1"
-        },
-        QuestionnaireResponse.QuestionnaireResponseItemComponent()
-      ) {}
-    )
-
-    assertThat(holder.itemView.findViewById<TextView>(R.id.prefix_text_view).isVisible).isFalse()
-  }
-
-  @Test
   fun emptyResponseOptions_showNoneSelected() = withViewHolder { holder ->
     holder.bind(
-      QuestionnaireItemViewItem(answerOptions("Coding 1", "Coding 2"), responseOptions()) {}
+      QuestionnaireViewItem(
+        answerOptions("Coding 1", "Coding 2"),
+        responseOptions(),
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+      )
     )
     assertThat(holder.itemView.findViewById<TextView>(R.id.multi_select_summary).text.toString())
       .isEqualTo("")
@@ -83,10 +57,12 @@ class QuestionnaireItemMultiSelectHolderFactoryInstrumentedTest {
   @Test
   fun selectedResponseOptions_showSelectedOptions() = withViewHolder { holder ->
     holder.bind(
-      QuestionnaireItemViewItem(
+      QuestionnaireViewItem(
         answerOptions("Coding 1", "Coding 2", "Coding 3"),
-        responseOptions("Coding 1", "Coding 3")
-      ) {}
+        responseOptions("Coding 1", "Coding 3"),
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+      )
     )
     assertThat(holder.itemView.findViewById<TextView>(R.id.multi_select_summary).text.toString())
       .isEqualTo("Coding 1, Coding 3")
@@ -96,13 +72,15 @@ class QuestionnaireItemMultiSelectHolderFactoryInstrumentedTest {
   @UiThreadTest
   fun displayValidationResult_error_shouldShowErrorMessage() = withViewHolder { viewHolder ->
     viewHolder.bind(
-      QuestionnaireItemViewItem(
+      QuestionnaireViewItem(
         Questionnaire.QuestionnaireItemComponent().apply {
           linkId = "1"
           required = true
         },
-        QuestionnaireResponse.QuestionnaireResponseItemComponent()
-      ) {}
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+        validationResult = Invalid(listOf("Missing answer for required field.")),
+        answersChangedCallback = { _, _, _, _ -> },
+      )
     )
 
     assertThat(
@@ -115,7 +93,7 @@ class QuestionnaireItemMultiSelectHolderFactoryInstrumentedTest {
   @UiThreadTest
   fun displayValidationResult_noError_shouldShowNoErrorMessage() = withViewHolder { viewHolder ->
     viewHolder.bind(
-      QuestionnaireItemViewItem(
+      QuestionnaireViewItem(
         Questionnaire.QuestionnaireItemComponent().apply {
           linkId = "1"
           required = true
@@ -131,8 +109,10 @@ class QuestionnaireItemMultiSelectHolderFactoryInstrumentedTest {
               value = Coding().apply { display = "display" }
             }
           )
-        }
-      ) {}
+        },
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+      )
     )
 
     assertThat(
@@ -144,13 +124,15 @@ class QuestionnaireItemMultiSelectHolderFactoryInstrumentedTest {
   @Test
   fun bind_readOnly_shouldDisableView() = withViewHolder { holder ->
     holder.bind(
-      QuestionnaireItemViewItem(
+      QuestionnaireViewItem(
         Questionnaire.QuestionnaireItemComponent().apply {
           linkId = "1"
           readOnly = true
         },
-        QuestionnaireResponse.QuestionnaireResponseItemComponent()
-      ) {}
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+      )
     )
 
     assertThat(
@@ -171,6 +153,7 @@ class QuestionnaireItemMultiSelectHolderFactoryInstrumentedTest {
 private fun answerOptions(vararg options: String) =
   Questionnaire.QuestionnaireItemComponent().apply {
     linkId = "1"
+    repeats = true
     options.forEach { option ->
       addAnswerOption(
         Questionnaire.QuestionnaireItemAnswerOptionComponent().apply {

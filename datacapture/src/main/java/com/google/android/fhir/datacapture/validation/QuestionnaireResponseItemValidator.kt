@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,40 +17,55 @@
 package com.google.android.fhir.datacapture.validation
 
 import android.content.Context
+import com.google.android.fhir.datacapture.extensions.isHidden
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.QuestionnaireResponse
 
 internal object QuestionnaireResponseItemValidator {
 
-  private val validators =
-    mutableListOf(
-      RequiredConstraintValidator,
-      MaxValueConstraintValidator,
-      MinValueConstraintValidator,
-      PrimitiveTypeAnswerMaxLengthValidator,
-      PrimitiveTypeAnswerMinLengthValidator,
-      RegexValidator,
-      DecimalTypeMaxDecimalValidator
+  /** Validators for [QuestionnaireResponse.QuestionnaireResponseItemComponent]. */
+  private val questionnaireResponseItemConstraintValidators =
+    listOf(
+      RequiredValidator,
     )
 
-  /** Validates [questionnaireResponseItem] contains valid answer(s) to [questionnaireItem]. */
+  /** Validators for [QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent]. */
+  private val answerConstraintValidators =
+    listOf(
+      MinValueValidator,
+      MaxValueValidator,
+      MinLengthValidator,
+      MaxLengthValidator,
+      MaxDecimalPlacesValidator,
+      RegexValidator,
+    )
+
+  /** Validates [answers] contains valid answer(s) to [questionnaireItem]. */
   fun validate(
     questionnaireItem: Questionnaire.QuestionnaireItemComponent,
-    questionnaireResponseItem: QuestionnaireResponse.QuestionnaireResponseItemComponent,
+    answers: List<QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent>,
     context: Context
   ): ValidationResult {
-    val validationResults = mutableListOf<ConstraintValidator.ConstraintValidationResult>()
-    validators.forEach {
-      validationResults.add(it.validate(questionnaireItem, questionnaireResponseItem, context))
+    if (questionnaireItem.isHidden) return NotValidated
+
+    val questionnaireResponseItemConstraintValidationResult =
+      questionnaireResponseItemConstraintValidators.map {
+        it.validate(questionnaireItem, answers, context)
+      }
+    val questionnaireResponseItemAnswerConstraintValidationResult =
+      answerConstraintValidators.flatMap { validator ->
+        answers.map { answer -> validator.validate(questionnaireItem, answer, context) }
+      }
+
+    return if (questionnaireResponseItemConstraintValidationResult.all { it.isValid } &&
+        questionnaireResponseItemAnswerConstraintValidationResult.all { it.isValid }
+    ) {
+      Valid
+    } else {
+      Invalid(
+        questionnaireResponseItemConstraintValidationResult.mapNotNull { it.errorMessage } +
+          questionnaireResponseItemAnswerConstraintValidationResult.mapNotNull { it.errorMessage }
+      )
     }
-    return ValidationResult(
-      validationResults.all { it.isValid },
-      validationResults.mapNotNull { it.message }.toList()
-    )
   }
 }
-
-data class ValidationResult(var isValid: Boolean, val validationMessages: List<String>)
-
-fun ValidationResult.getSingleStringValidationMessage() =
-  this.validationMessages.joinToString(separator = "\n")

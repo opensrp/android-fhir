@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
-import org.hl7.fhir.r4.model.ResourceType
 
 /**
  * Class that holds what type of resources we need to synchronise and what are the parameters of
@@ -29,9 +28,14 @@ import org.hl7.fhir.r4.model.ResourceType
  */
 typealias ParamMap = Map<String, String>
 
-typealias ResourceSyncParams = Map<ResourceType, ParamMap>
 /** Constant for the max number of retries in case of sync failure */
 @PublishedApi internal const val MAX_RETRIES_ALLOWED = "max_retires"
+
+/** Constant for the Greater Than Search Prefix */
+@PublishedApi internal const val GREATER_THAN_PREFIX = "gt"
+
+/** Constant for the default number of resource entries in a singe Bundle for upload. */
+const val DEFAULT_BUNDLE_SIZE = 500
 
 val defaultRetryConfiguration =
   RetryConfiguration(BackoffCriteria(BackoffPolicy.LINEAR, 30, TimeUnit.SECONDS), 3)
@@ -40,19 +44,9 @@ object SyncDataParams {
   const val SORT_KEY = "_sort"
   const val LAST_UPDATED_KEY = "_lastUpdated"
   const val ADDRESS_COUNTRY_KEY = "address-country"
-  const val LAST_UPDATED_ASC_VALUE = "_lastUpdated"
+  const val SUMMARY_KEY = "_summary"
+  const val SUMMARY_COUNT_VALUE = "count"
 }
-
-/** Configuration for synchronization. */
-data class SyncConfiguration(
-  /** Data that needs to be synchronised */
-  val resourceSyncParams: List<ResourceSyncParams> = emptyList(),
-  /**
-   * true if the SDK needs to retry a failed sync attempt, false otherwise If this is set to true,
-   * then the result of the sync will be reported after the retry.
-   */
-  val retry: Boolean = false
-)
 
 /** Configuration for period synchronisation */
 class PeriodicSyncConfiguration(
@@ -114,4 +108,16 @@ data class BackoffCriteria(
 
   /** The time unit for [backoffDelay] */
   val timeUnit: TimeUnit
+)
+
+/**
+ * Configuration for max number of resources to be uploaded in a Bundle.The default size is
+ * [DEFAULT_BUNDLE_SIZE].
+ */
+data class UploadConfiguration(
+  /**
+   * Number of [Resource]s to be added in a singe [Bundle] for upload and default is
+   * [DEFAULT_BUNDLE_SIZE]
+   */
+  val uploadBundleSize: Int = DEFAULT_BUNDLE_SIZE
 )

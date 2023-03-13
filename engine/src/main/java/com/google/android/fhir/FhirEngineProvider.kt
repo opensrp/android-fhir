@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,15 @@ package com.google.android.fhir
 
 import android.content.Context
 import com.google.android.fhir.DatabaseErrorStrategy.UNSPECIFIED
+import com.google.android.fhir.sync.Authenticator
+import com.google.android.fhir.sync.DataSource
+import com.google.android.fhir.sync.remote.HttpLogger
+import org.hl7.fhir.r4.model.SearchParameter
 
-/** The builder for [FhirEngine] instance */
+/** The provider for [FhirEngine] instance. */
 object FhirEngineProvider {
-  private lateinit var fhirEngineConfiguration: FhirEngineConfiguration
-  private lateinit var fhirEngine: FhirEngine
+  private var fhirEngineConfiguration: FhirEngineConfiguration? = null
+  private var fhirServices: FhirServices? = null
 
   /**
    * Initializes the [FhirEngine] singleton with a custom Configuration.
@@ -31,7 +35,7 @@ object FhirEngineProvider {
    */
   @Synchronized
   fun init(fhirEngineConfiguration: FhirEngineConfiguration) {
-    check(!FhirEngineProvider::fhirEngineConfiguration.isInitialized) {
+    check(this.fhirEngineConfiguration == null) {
       "FhirEngineProvider: FhirEngineConfiguration has already been initialized."
     }
     this.fhirEngineConfiguration = fhirEngineConfiguration
@@ -45,20 +49,48 @@ object FhirEngineProvider {
    */
   @Synchronized
   fun getInstance(context: Context): FhirEngine {
-    if (!::fhirEngine.isInitialized) {
-      if (!::fhirEngineConfiguration.isInitialized) {
-        fhirEngineConfiguration = FhirEngineConfiguration()
-      }
-      fhirEngine =
+    return getOrCreateFhirService(context).fhirEngine
+  }
+
+  @Synchronized
+  @JvmStatic // needed for mockito
+  internal fun getDataSource(context: Context): DataSource? {
+    return getOrCreateFhirService(context).remoteDataSource
+  }
+
+  @Synchronized
+  private fun getOrCreateFhirService(context: Context): FhirServices {
+    if (fhirServices == null) {
+      fhirEngineConfiguration = fhirEngineConfiguration ?: FhirEngineConfiguration()
+      val configuration = checkNotNull(fhirEngineConfiguration)
+      fhirServices =
         FhirServices.builder(context.applicationContext)
           .apply {
-            if (fhirEngineConfiguration.enableEncryptionIfSupported) enableEncryptionIfSupported()
-            setDatabaseErrorStrategy(fhirEngineConfiguration.databaseErrorStrategy)
+            if (configuration.enableEncryptionIfSupported) enableEncryptionIfSupported()
+            setDatabaseErrorStrategy(configuration.databaseErrorStrategy)
+            configuration.serverConfiguration?.let { setServerConfiguration(it) }
+            configuration.customSearchParameters?.let { setSearchParameters(it) }
+            if (configuration.testMode) {
+              inMemory()
+            }
           }
           .build()
-          .fhirEngine
     }
-    return fhirEngine
+    return checkNotNull(fhirServices)
+  }
+
+  @Synchronized
+  fun cleanup() {
+    check(fhirEngineConfiguration?.testMode == true) {
+      "FhirEngineProvider: FhirEngineProvider needs to be in the test mode to perform cleanup."
+    }
+    forceCleanup()
+  }
+
+  internal fun forceCleanup() {
+    fhirServices?.database?.close()
+    fhirServices = null
+    fhirEngineConfiguration = null
   }
 }
 
@@ -73,7 +105,22 @@ object FhirEngineProvider {
  */
 data class FhirEngineConfiguration(
   val enableEncryptionIfSupported: Boolean = false,
-  val databaseErrorStrategy: DatabaseErrorStrategy = UNSPECIFIED
+  val databaseErrorStrategy: DatabaseErrorStrategy = UNSPECIFIED,
+  val serverConfiguration: ServerConfiguration? = null,
+  val testMode: Boolean = false,
+  /**
+   * Additional search parameters to be used to query FHIR engine using the search API. These are in
+   * addition to the default search parameters defined in
+   * [FHIR](https://www.hl7.org/fhir/searchparameter-registry.html). The search parameters should be
+   * unique and not change the existing/default search parameters and it may lead to unexpected
+   * search behaviour.
+   *
+   * NOTE: The engine doesn't reindex resources after a new [SearchParameter] is added to the
+   * engine. It is the responsibility of the app developer to reindex the resources by updating
+   * them. Any new CRUD operations on a resource after a new [SearchParameter] is added will result
+   * in the reindexing of the resource.
+   */
+  val customSearchParameters: List<SearchParameter>? = null
 )
 
 enum class DatabaseErrorStrategy {
@@ -91,3 +138,28 @@ enum class DatabaseErrorStrategy {
    */
   RECREATE_AT_OPEN
 }
+
+/** A configuration to provide necessary params for network connection. */
+data class ServerConfiguration(
+  /** Url of the remote FHIR server. */
+  val baseUrl: String,
+  /** A configuration to provide the network connection parameters. */
+  val networkConfiguration: NetworkConfiguration = NetworkConfiguration(),
+  /**
+   * An [Authenticator] for supplying any auth token that may be necessary to communicate with the
+   * server
+   */
+  val authenticator: Authenticator? = null,
+  /** Logs the communication between the engine and the remote server. */
+  val httpLogger: HttpLogger = HttpLogger.NONE
+)
+
+/** A configuration to provide the network connection parameters. */
+data class NetworkConfiguration(
+  /** Connection timeout (in seconds). The default is 10 seconds. */
+  val connectionTimeOut: Long = 10,
+  /** Read timeout (in seconds) for network connection. The default is 10 seconds. */
+  val readTimeOut: Long = 10,
+  /** Write timeout (in seconds) for network connection. The default is 10 seconds. */
+  val writeTimeOut: Long = 10
+)

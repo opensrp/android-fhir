@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,10 +48,13 @@ import org.hl7.fhir.r4.model.InstantType
 import org.hl7.fhir.r4.model.IntegerType
 import org.hl7.fhir.r4.model.Location
 import org.hl7.fhir.r4.model.Money
+import org.hl7.fhir.r4.model.Patient
 import org.hl7.fhir.r4.model.Period
 import org.hl7.fhir.r4.model.Quantity
 import org.hl7.fhir.r4.model.Reference
 import org.hl7.fhir.r4.model.Resource
+import org.hl7.fhir.r4.model.SearchParameter
+import org.hl7.fhir.r4.model.StringType
 import org.hl7.fhir.r4.model.Timing
 import org.hl7.fhir.r4.model.UriType
 import org.hl7.fhir.r4.utils.FHIRPathEngine
@@ -60,7 +63,9 @@ import org.hl7.fhir.r4.utils.FHIRPathEngine
  * Indexes a FHIR resource according to the
  * [search parameters](https://www.hl7.org/fhir/searchparameter-registry.html).
  */
-internal object ResourceIndexer {
+internal class ResourceIndexer(
+  private val searchParamDefinitionsProvider: SearchParamDefinitionsProvider
+) {
   // Switched HapiWorkerContext to SimpleWorkerContext as a fix for
   // https://github.com/google/android-fhir/issues/768
   private val fhirPathEngine = FHIRPathEngine(SimpleWorkerContext())
@@ -69,7 +74,8 @@ internal object ResourceIndexer {
 
   private fun <R : Resource> extractIndexValues(resource: R): ResourceIndices {
     val indexBuilder = ResourceIndices.Builder(resource.resourceType, resource.logicalId)
-    getSearchParamList(resource)
+    searchParamDefinitionsProvider
+      .get(resource)
       .map { it to fhirPathEngine.evaluate(resource, it.path) }
       .flatMap { pair -> pair.second.map { pair.first to it } }
       .forEach { pair ->
@@ -98,6 +104,30 @@ internal object ResourceIndexer {
         }
       }
 
+    addIndexesFromResourceClass(resource, indexBuilder)
+    return indexBuilder.build()
+  }
+
+  /**
+   * Manually add indexes for [SearchParameter]s defined in [Resource] class. This is because:
+   * 1. There is no clear way defined in the search parameter definitions to figure out the class
+   * hierarchy of the model classes in codegen.
+   * 2. Common [SearchParameter]'s paths are defined for [Resource] class e.g even for the [Patient]
+   * model, the [SearchParameter] expression for id would be `Resource.id` and
+   * [FHIRPathEngine.evaluate] doesn't return anything when [Patient] is passed to the function.
+   */
+  private fun <R : Resource> addIndexesFromResourceClass(
+    resource: R,
+    indexBuilder: ResourceIndices.Builder
+  ) {
+    indexBuilder.addTokenIndex(
+      TokenIndex(
+        "_id",
+        arrayOf(resource.fhirType(), "id").joinToString(separator = "."),
+        null,
+        resource.logicalId
+      )
+    )
     // Add 'lastUpdated' index to all resources.
     if (resource.meta.hasLastUpdated()) {
       val lastUpdatedElement = resource.meta.lastUpdatedElement
@@ -112,30 +142,33 @@ internal object ResourceIndexer {
     }
 
     if (resource.meta.hasProfile()) {
-      resource.meta.profile.filter { it.value != null && it.value.isNotEmpty() }.forEach {
-        indexBuilder.addReferenceIndex(
-          ReferenceIndex(
-            "_profile",
-            arrayOf(resource.fhirType(), "meta", "profile").joinToString(separator = "."),
-            it.value
+      resource.meta.profile
+        .filter { it.value != null && it.value.isNotEmpty() }
+        .forEach {
+          indexBuilder.addReferenceIndex(
+            ReferenceIndex(
+              "_profile",
+              arrayOf(resource.fhirType(), "meta", "profile").joinToString(separator = "."),
+              it.value
+            )
           )
-        )
-      }
+        }
     }
 
     if (resource.meta.hasTag()) {
-      resource.meta.tag.filter { it.code != null && it.code!!.isNotEmpty() }.forEach {
-        indexBuilder.addTokenIndex(
-          TokenIndex(
-            "_tag",
-            arrayOf(resource.fhirType(), "meta", "tag").joinToString(separator = "."),
-            it.system ?: "",
-            it.code
+      resource.meta.tag
+        .filter { it.code != null && it.code!!.isNotEmpty() }
+        .forEach {
+          indexBuilder.addTokenIndex(
+            TokenIndex(
+              "_tag",
+              arrayOf(resource.fhirType(), "meta", "tag").joinToString(separator = "."),
+              it.system ?: "",
+              it.code
+            )
           )
-        )
-      }
+        }
     }
-    return indexBuilder.build()
   }
 
   private fun numberIndex(searchParam: SearchParamDefinition, value: Base): NumberIndex? =
@@ -184,12 +217,31 @@ internal object ResourceIndexer {
       }
       "Timing" -> {
         val timing = value as Timing
-        DateTimeIndex(
-          searchParam.name,
-          searchParam.path,
-          timing.event.minOf { it.value.time },
-          timing.event.maxOf { it.precision.add(it.value, 1).time } - 1
-        )
+        // Skip for now if its is repeating.
+        if (timing.hasEvent()) {
+          DateTimeIndex(
+            searchParam.name,
+            searchParam.path,
+            timing.event.minOf { it.value.time },
+            timing.event.maxOf { it.precision.add(it.value, 1).time } - 1
+          )
+        } else null
+      }
+      "string" -> {
+        // e.g. CarePlan may have schedule as a string value 2011-06-27T09:30:10+01:00 (see
+        // https://www.hl7.org/fhir/careplan-example-f001-heart.json.html)
+        // OR 'daily' (see https://www.hl7.org/fhir/careplan-example-f201-renal.json.html)
+        try {
+          val dateTime = DateTimeType((value as StringType).value)
+          DateTimeIndex(
+            searchParam.name,
+            searchParam.path,
+            dateTime.value.time,
+            dateTime.precision.add(dateTime.value, 1).time - 1
+          )
+        } catch (e: IllegalArgumentException) {
+          null
+        }
       }
       else -> null
     }
@@ -260,11 +312,12 @@ internal object ResourceIndexer {
       }
       "CodeableConcept" -> {
         val codeableConcept = value as CodeableConcept
-        codeableConcept.coding.filter { it.code != null && it.code!!.isNotEmpty() }.map {
-          TokenIndex(searchParam.name, searchParam.path, it.system ?: "", it.code)
-        }
+        codeableConcept.coding
+          .filter { it.code != null && it.code!!.isNotEmpty() }
+          .map { TokenIndex(searchParam.name, searchParam.path, it.system ?: "", it.code) }
       }
-      "code" -> {
+      "code",
+      "Coding" -> {
         val coding = value as ICoding
         listOf(TokenIndex(searchParam.name, searchParam.path, coding.system ?: "", coding.code))
       }
@@ -350,15 +403,13 @@ internal object ResourceIndexer {
     }
   }
 
-  /**
-   * The FHIR currency code system. See: https://bit.ly/30YB3ML. See:
-   * https://www.hl7.org/fhir/valueset-currencies.html.
-   */
-  private const val FHIR_CURRENCY_CODE_SYSTEM = "urn:iso:std:iso:4217"
+  companion object {
+    /**
+     * The FHIR currency code system. See: https://bit.ly/30YB3ML. See:
+     * https://www.hl7.org/fhir/valueset-currencies.html.
+     */
+    private const val FHIR_CURRENCY_CODE_SYSTEM = "urn:iso:std:iso:4217"
+  }
 }
 
-internal data class SearchParamDefinition(
-  val name: String,
-  val type: SearchParamType,
-  val path: String
-)
+data class SearchParamDefinition(val name: String, val type: SearchParamType, val path: String)
