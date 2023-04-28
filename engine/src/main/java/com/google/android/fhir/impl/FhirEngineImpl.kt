@@ -31,10 +31,12 @@ import com.google.android.fhir.search.execute
 import com.google.android.fhir.search.getIncludeQuery
 import com.google.android.fhir.search.getQuery
 import com.google.android.fhir.sync.ConflictResolver
+import com.google.android.fhir.sync.DownloadState
 import com.google.android.fhir.sync.Resolved
 import java.time.OffsetDateTime
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.onEach
 import org.hl7.fhir.r4.model.Bundle
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
@@ -62,7 +64,7 @@ internal class FhirEngineImpl(private val database: Database, private val contex
   override suspend fun <R : Resource> search(search: Search): List<R> {
     return search.execute(database)
   }
-/*
+  /*
   suspend fun sample(dateFrom: Long, limit: Long) {
 
     val searchQuery =
@@ -135,31 +137,31 @@ internal class FhirEngineImpl(private val database: Database, private val contex
 
   override suspend fun syncDownload(
     conflictResolver: ConflictResolver,
-    download: suspend () -> Flow<List<Resource>>
-  ) {
+    download: suspend () -> Flow<DownloadState>
+  ): Flow<DownloadState> =
     download(
         object : SyncDownloadContext {
           override suspend fun getLatestTimestampFor(type: ResourceType) = database.lastUpdate(type)
         }
       )
-      .collect { resources ->
-        try {
-          database.withTransaction {
-            val resolved =
-              resolveConflictingResources(
-                resources,
-                getConflictingResourceIds(resources),
-                conflictResolver
-              )
-            database.insertSyncedResources(resources)
-            saveResolvedResourcesToDatabase(resolved)
+      .onEach {
+        if (it is DownloadState.Success) {
+          try {
+            database.withTransaction {
+              val resolved =
+                resolveConflictingResources(
+                  it.resources,
+                  getConflictingResourceIds(it.resources),
+                  conflictResolver
+                )
+              database.insertSyncedResources(it.resources)
+              saveResolvedResourcesToDatabase(resolved)
+            }
+          } catch (exception: Exception) {
+            Timber.e(exception, "Save remote and resolved conflicting resources to database failed")
           }
-        } catch (exception: Exception) {
-          Timber.e(exception, "Save remote and resolved conflicting resources to database failed")
         }
       }
-    }
-  }
 
   private suspend fun saveResolvedResourcesToDatabase(resolved: List<Resource>?) {
     resolved?.let {

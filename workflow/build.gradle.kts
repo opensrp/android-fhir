@@ -10,7 +10,7 @@ plugins {
   id(Plugins.BuildPlugins.dokka).version(Plugins.Versions.dokka)
 }
 
-publishing{
+publishing {
   repositories {
     maven {
       credentials(PasswordCredentials::class)
