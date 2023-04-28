@@ -41,6 +41,7 @@ import org.hl7.fhir.r4.model.Bundle
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
 import timber.log.Timber
+import com.google.android.fhir.db.impl.entities.SyncedResourceEntity
 
 /** Implementation of [FhirEngine]. */
 internal class FhirEngineImpl(private val database: Database, private val context: Context) :
@@ -139,11 +140,7 @@ internal class FhirEngineImpl(private val database: Database, private val contex
     conflictResolver: ConflictResolver,
     download: suspend () -> Flow<DownloadState>
   ): Flow<DownloadState> =
-    download(
-        object : SyncDownloadContext {
-          override suspend fun getLatestTimestampFor(type: ResourceType) = database.lastUpdate(type)
-        }
-      )
+    download()
       .onEach {
         if (it is DownloadState.Success) {
           try {
@@ -154,7 +151,8 @@ internal class FhirEngineImpl(private val database: Database, private val contex
                   getConflictingResourceIds(it.resources),
                   conflictResolver
                 )
-              database.insertSyncedResources(it.resources)
+
+              saveRemoteResourcesToDatabase(it.resources)
               saveResolvedResourcesToDatabase(resolved)
             }
           } catch (exception: Exception) {
@@ -169,6 +167,7 @@ internal class FhirEngineImpl(private val database: Database, private val contex
       database.update(*it.toTypedArray())
     }
   }
+
 
   private suspend fun saveRemoteResourcesToDatabase(resources: List<Resource>) {
     val timeStamps =
