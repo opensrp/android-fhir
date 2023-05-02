@@ -41,7 +41,7 @@ import org.hl7.fhir.r4.model.Bundle
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
 import timber.log.Timber
-import com.google.android.fhir.db.impl.entities.SyncedResourceEntity
+import com.google.android.fhir.toTimeZoneString
 
 /** Implementation of [FhirEngine]. */
 internal class FhirEngineImpl(private val database: Database, private val context: Context) :
@@ -152,7 +152,7 @@ internal class FhirEngineImpl(private val database: Database, private val contex
                   conflictResolver
                 )
 
-              saveRemoteResourcesToDatabase(it.resources)
+              database.insertSyncedResources(it.resources)
               saveResolvedResourcesToDatabase(resolved)
             }
           } catch (exception: Exception) {
@@ -166,17 +166,6 @@ internal class FhirEngineImpl(private val database: Database, private val contex
       database.deleteUpdates(it)
       database.update(*it.toTypedArray())
     }
-  }
-
-
-  private suspend fun saveRemoteResourcesToDatabase(resources: List<Resource>) {
-    val timeStamps =
-      resources
-        .groupBy { it.resourceType }
-        .entries.map {
-          SyncedResourceEntity(it.key, it.value.maxOf { it.meta.lastUpdated }.toTimeZoneString())
-        }
-    database.insertSyncedResources(timeStamps, resources)
   }
 
   private suspend fun resolveConflictingResources(
