@@ -147,6 +147,7 @@ object TestFhirEngineImpl : FhirEngine {
   }
 
   override suspend fun <R : Resource> searchWithRevInclude(
+    isRevInclude: Boolean,
     search: Search
   ): Map<R, Map<ResourceType, List<Resource>>> {
     TODO("Not yet implemented")

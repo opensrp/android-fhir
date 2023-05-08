@@ -56,6 +56,7 @@ interface FhirEngine {
   suspend fun <R : Resource> search(searchQuery: SearchQuery): List<R>
 
   suspend fun <R : Resource> searchWithRevInclude(
+    isRevInclude: Boolean,
     search: Search
   ): Map<R, Map<ResourceType, List<Resource>>>
 
