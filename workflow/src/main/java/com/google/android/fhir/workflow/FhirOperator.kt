@@ -59,7 +59,7 @@ import org.opencds.cqf.cql.evaluator.plandefinition.r4.PlanDefinitionProcessor
 // Uses the already cached FhirContext instead of creating a new one
 // on the default protected R4FhirModelResolver() constructor.
 // This is a heavy object to load. Avoid having to create a new one.
-object cachedR4FhirModelResolver : R4FhirModelResolver(FhirContext.forR4Cached())
+object cachedR4FhirModelResolver : R4FhirModelResolver(FhirContext.forR4())
 
 class FhirOperator(fhirContext: FhirContext, fhirEngine: FhirEngine) {
   // Initialize the measure processor
