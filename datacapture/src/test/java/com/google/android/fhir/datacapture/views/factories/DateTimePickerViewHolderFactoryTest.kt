@@ -525,6 +525,65 @@ class DateTimePickerViewHolderFactoryTest {
     assertThat(viewHolder.timeInputView.text.toString()).isEmpty()
   }
 
+  @Test
+  fun `shows required text`() {
+    viewHolder.bind(
+      QuestionnaireViewItem(
+        Questionnaire.QuestionnaireItemComponent().apply { required = true },
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+        showRequiredText = true
+      )
+    )
+
+    assertThat(
+        viewHolder.itemView
+          .findViewById<TextInputLayout>(R.id.date_input_layout)
+          .helperText.toString()
+      )
+      .isEqualTo("Required")
+  }
+
+  @Test
+  fun `shows optional text`() {
+    viewHolder.bind(
+      QuestionnaireViewItem(
+        Questionnaire.QuestionnaireItemComponent(),
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+        showOptionalText = true
+      )
+    )
+
+    assertThat(
+        viewHolder.itemView
+          .findViewById<TextInputLayout>(R.id.date_input_layout)
+          .helperText.toString()
+      )
+      .isEqualTo("Optional")
+  }
+
+  @Test
+  fun `shows asterisk`() {
+    viewHolder.bind(
+      QuestionnaireViewItem(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          text = "Question?"
+          required = true
+        },
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+        showAsterisk = true
+      )
+    )
+
+    assertThat(viewHolder.itemView.findViewById<TextView>(R.id.question).text.toString())
+      .isEqualTo("Question?*")
+  }
+
   private val QuestionnaireItemViewHolder.dateInputView: TextView
     get() {
       return itemView.findViewById(R.id.date_input_edit_text)

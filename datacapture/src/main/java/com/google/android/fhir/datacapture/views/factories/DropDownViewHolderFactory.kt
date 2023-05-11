@@ -26,6 +26,7 @@ import android.widget.ArrayAdapter
 import android.widget.TextView
 import com.google.android.fhir.datacapture.R
 import com.google.android.fhir.datacapture.extensions.displayString
+import com.google.android.fhir.datacapture.extensions.getRequiredOrOptionalText
 import com.google.android.fhir.datacapture.extensions.itemAnswerOptionImage
 import com.google.android.fhir.datacapture.extensions.localizedFlyoverSpanned
 import com.google.android.fhir.datacapture.validation.Invalid
@@ -60,6 +61,10 @@ internal object DropDownViewHolderFactory :
         cleanupOldState()
         header.bind(questionnaireViewItem)
         textInputLayout.hint = questionnaireViewItem.enabledDisplayItems.localizedFlyoverSpanned
+        with(textInputLayout) {
+          hint = questionnaireViewItem.enabledDisplayItems.localizedFlyoverSpanned
+          helperText = getRequiredOrOptionalText(questionnaireViewItem, context)
+        }
         val answerOptionList =
           this.questionnaireViewItem.answerOption
             .map {
@@ -121,7 +126,17 @@ internal object DropDownViewHolderFactory :
           when (validationResult) {
             is NotValidated,
             Valid -> null
-            is Invalid -> validationResult.getSingleStringValidationMessage()
+            is Invalid -> {
+              val validationMessage = validationResult.getSingleStringValidationMessage()
+              if (questionnaireViewItem.questionnaireItem.required &&
+                  questionnaireViewItem.showRequiredText
+              ) {
+                textInputLayout.context.getString(R.string.required_text_and_new_line) +
+                  validationMessage
+              } else {
+                validationMessage
+              }
+            }
           }
       }
 

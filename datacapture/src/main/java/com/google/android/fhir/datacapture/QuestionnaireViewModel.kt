@@ -219,6 +219,16 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
   /** Flag to show/hide submit button. Default is true. */
   private var shouldShowSubmitButton = state[QuestionnaireFragment.EXTRA_SHOW_SUBMIT_BUTTON] ?: true
 
+  /** Flag to control whether asterisk text is shown. */
+  private var showAsterisk = state[QuestionnaireFragment.EXTRA_SHOW_ASTERISK_TEXT] ?: false
+
+  /** Flag to control whether required text is shown. */
+  private var showRequiredText = state[QuestionnaireFragment.EXTRA_SHOW_REQUIRED_TEXT] ?: true
+
+  /** Flag to control whether optional text is shown. */
+  private var markOptionalQuestionText =
+    state[QuestionnaireFragment.EXTRA_SHOW_OPTIONAL_TEXT] ?: false
+
   /** The pages of the questionnaire, or null if the questionnaire is not paginated. */
   @VisibleForTesting var pages: List<QuestionnairePage>? = null
 
@@ -691,7 +701,10 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
               questionnaireItem.item.filter {
                 it.isDisplayItem &&
                   EnablementEvaluator(questionnaireResponse).evaluate(it, questionnaireResponseItem)
-              }
+              },
+            showAsterisk = showAsterisk,
+            showRequiredText = showRequiredText,
+            showOptionalText = markOptionalQuestionText
           )
         )
       )

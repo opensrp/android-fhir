@@ -373,6 +373,76 @@ class QuestionnaireItemDialogMultiSelectViewHolderFactoryEspressoTest {
   }
 
   @Test
+  fun shows_requiredText_asHelperText() {
+    runOnUI {
+      viewHolder.bind(
+        QuestionnaireViewItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "1"
+            required = true
+            text = "Question?"
+          },
+          QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+          validationResult = NotValidated,
+          answersChangedCallback = { _, _, _, _ -> },
+          showRequiredText = true
+        )
+      )
+
+      assertThat(
+          viewHolder.itemView
+            .findViewById<TextInputLayout>(R.id.multi_select_summary_holder)
+            .helperText.toString()
+        )
+        .isEqualTo("Required")
+    }
+  }
+
+  @Test
+  fun shows_requiredText() {
+    runOnUI {
+      viewHolder.bind(
+        QuestionnaireViewItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "1"
+            required = true
+          },
+          QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+          validationResult = NotValidated,
+          answersChangedCallback = { _, _, _, _ -> },
+          showOptionalText = true
+        )
+      )
+
+      assertThat(
+          viewHolder.itemView.findViewById<TextView>(R.id.required_optional_text).text.toString()
+        )
+        .isEqualTo("Required")
+    }
+  }
+
+  @Test
+  fun shows_optionalText_asHelperText() {
+    runOnUI {
+      viewHolder.bind(
+        QuestionnaireViewItem(
+          Questionnaire.QuestionnaireItemComponent().apply { linkId = "1" },
+          QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+          validationResult = NotValidated,
+          answersChangedCallback = { _, _, _, _ -> },
+          showOptionalText = true
+        )
+      )
+      assertThat(
+          viewHolder.itemView
+            .findViewById<TextInputLayout>(R.id.multi_select_summary_holder)
+            .helperText.toString()
+        )
+        .isEqualTo("Optional")
+    }
+  }
+
+  @Test
   fun multipleChoice_doNotShowErrorInitially() {
     val questionnaireViewItem =
       QuestionnaireViewItem(

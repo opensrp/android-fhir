@@ -248,35 +248,57 @@ class AutoCompleteViewHolderFactoryTest {
   }
 
   @Test
-  fun bind_readOnly_shouldDisableView() {
-    val questionnaireItem =
-      Questionnaire.QuestionnaireItemComponent().apply {
-        readOnly = true
-        addAnswerOption(
-          Questionnaire.QuestionnaireItemAnswerOptionComponent().apply {
-            value = Coding().apply { display = "readOnly" }
-          }
-        )
-      }
+  fun `shows required text`() {
     viewHolder.bind(
       QuestionnaireViewItem(
-        questionnaireItem,
-        QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
-          addAnswer(
-            QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
-              value =
-                questionnaireItem.answerOption
-                  .first { it.value.displayString(parent.context) == "readOnly" }
-                  .valueCoding
-            }
-          )
-        },
+        Questionnaire.QuestionnaireItemComponent().apply { required = true },
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
         validationResult = NotValidated,
         answersChangedCallback = { _, _, _, _ -> },
+        showRequiredText = true
       )
     )
 
-    assertThat(viewHolder.itemView.findViewById<ChipGroup>(R.id.chipContainer)[0].isEnabled)
-      .isFalse()
+    assertThat(
+        viewHolder.itemView.findViewById<TextView>(R.id.required_optional_text).text.toString()
+      )
+      .isEqualTo("Required")
+  }
+
+  @Test
+  fun `shows asterisk`() {
+    viewHolder.bind(
+      QuestionnaireViewItem(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          text = "Question"
+          required = true
+        },
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+        showAsterisk = true
+      )
+    )
+
+    assertThat(viewHolder.itemView.findViewById<TextView>(R.id.question).text.toString())
+      .isEqualTo("Question*")
+  }
+
+  @Test
+  fun `shows optional text`() {
+    viewHolder.bind(
+      QuestionnaireViewItem(
+        Questionnaire.QuestionnaireItemComponent().apply { text = "Question" },
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+        showOptionalText = true
+      )
+    )
+
+    assertThat(
+        viewHolder.itemView.findViewById<TextView>(R.id.required_optional_text).text.toString()
+      )
+      .isEqualTo("Optional")
   }
 }

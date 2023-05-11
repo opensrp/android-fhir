@@ -26,6 +26,7 @@ import android.view.inputmethod.InputMethodManager
 import androidx.annotation.LayoutRes
 import androidx.core.widget.doAfterTextChanged
 import com.google.android.fhir.datacapture.R
+import com.google.android.fhir.datacapture.extensions.getRequiredOrOptionalText
 import com.google.android.fhir.datacapture.extensions.localizedFlyoverSpanned
 import com.google.android.fhir.datacapture.validation.Invalid
 import com.google.android.fhir.datacapture.validation.NotValidated
@@ -81,7 +82,10 @@ abstract class QuestionnaireItemEditTextViewHolderDelegate(private val rawInputT
 
   override fun bind(questionnaireViewItem: QuestionnaireViewItem) {
     header.bind(questionnaireViewItem)
-    textInputLayout.hint = questionnaireViewItem.enabledDisplayItems.localizedFlyoverSpanned
+    with(textInputLayout) {
+      hint = questionnaireViewItem.enabledDisplayItems.localizedFlyoverSpanned
+      helperText = getRequiredOrOptionalText(questionnaireViewItem, context)
+    }
     displayValidationResult(questionnaireViewItem.validationResult)
 
     textInputEditText.removeTextChangedListener(textWatcher)
@@ -98,7 +102,17 @@ abstract class QuestionnaireItemEditTextViewHolderDelegate(private val rawInputT
       when (validationResult) {
         is NotValidated,
         Valid -> null
-        is Invalid -> validationResult.getSingleStringValidationMessage()
+        is Invalid -> {
+          val validationMessage = validationResult.getSingleStringValidationMessage()
+          if (questionnaireViewItem.questionnaireItem.required &&
+              questionnaireViewItem.showRequiredText
+          ) {
+            textInputLayout.context.getString(R.string.required_text_and_new_line) +
+              validationMessage
+          } else {
+            validationMessage
+          }
+        }
       }
   }
 

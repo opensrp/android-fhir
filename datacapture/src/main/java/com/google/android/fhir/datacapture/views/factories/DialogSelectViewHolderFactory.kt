@@ -28,6 +28,7 @@ import com.google.android.fhir.datacapture.R
 import com.google.android.fhir.datacapture.extensions.ItemControlTypes
 import com.google.android.fhir.datacapture.extensions.asStringValue
 import com.google.android.fhir.datacapture.extensions.displayString
+import com.google.android.fhir.datacapture.extensions.getRequiredOrOptionalText
 import com.google.android.fhir.datacapture.extensions.itemControl
 import com.google.android.fhir.datacapture.extensions.localizedFlyoverSpanned
 import com.google.android.fhir.datacapture.extensions.localizedTextSpanned
@@ -63,8 +64,10 @@ internal object QuestionnaireItemDialogSelectViewHolderFactory :
 
       override fun bind(questionnaireViewItem: QuestionnaireViewItem) {
         cleanupOldState()
-        holder.summaryHolder.hint =
-          questionnaireViewItem.enabledDisplayItems.localizedFlyoverSpanned
+        with(holder.summaryHolder) {
+          hint = questionnaireViewItem.enabledDisplayItems.localizedFlyoverSpanned
+          helperText = getRequiredOrOptionalText(questionnaireViewItem, context)
+        }
         val activity =
           requireNotNull(holder.header.context.tryUnwrapContext()) {
             "Can only use dialog select in an AppCompatActivity context"
@@ -116,7 +119,17 @@ internal object QuestionnaireItemDialogSelectViewHolderFactory :
           when (validationResult) {
             is NotValidated,
             Valid -> null
-            is Invalid -> validationResult.getSingleStringValidationMessage()
+            is Invalid -> {
+              val validationMessage = validationResult.getSingleStringValidationMessage()
+              if (questionnaireViewItem.questionnaireItem.required &&
+                  questionnaireViewItem.showRequiredText
+              ) {
+                holder.summaryHolder.context.getString(R.string.required_text_and_new_line) +
+                  validationMessage
+              } else {
+                validationMessage
+              }
+            }
           }
       }
 

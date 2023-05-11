@@ -20,13 +20,19 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
 import com.google.android.fhir.datacapture.R
+import com.google.android.fhir.datacapture.extensions.EXTENSION_DISPLAY_CATEGORY_SYSTEM
+import com.google.android.fhir.datacapture.extensions.EXTENSION_DISPLAY_CATEGORY_URL
 import com.google.android.fhir.datacapture.extensions.EXTENSION_SLIDER_STEP_VALUE_URL
+import com.google.android.fhir.datacapture.extensions.INSTRUCTIONS
 import com.google.android.fhir.datacapture.validation.Invalid
 import com.google.android.fhir.datacapture.validation.NotValidated
 import com.google.android.fhir.datacapture.views.QuestionnaireViewItem
 import com.google.android.material.slider.Slider
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.assertFailsWith
+import org.hl7.fhir.r4.model.CodeableConcept
+import org.hl7.fhir.r4.model.Coding
+import org.hl7.fhir.r4.model.Extension
 import org.hl7.fhir.r4.model.IntegerType
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.QuestionnaireResponse
@@ -380,4 +386,75 @@ class SliderViewHolderFactoryTest {
 
     assertThat(viewHolder.itemView.findViewById<Slider>(R.id.slider).value).isEqualTo(50)
   }
+
+  @Test
+  fun `shows required text`() {
+    viewHolder.bind(
+      QuestionnaireViewItem(
+        Questionnaire.QuestionnaireItemComponent().apply { required = true },
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+        showRequiredText = true
+      )
+    )
+
+    assertThat(
+        viewHolder.itemView.findViewById<TextView>(R.id.required_optional_text).text.toString()
+      )
+      .isEqualTo("Required")
+  }
+
+  @Test
+  fun `shows asterisk`() {
+    viewHolder.bind(
+      QuestionnaireViewItem(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          text = "Question"
+          required = true
+        },
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+        showAsterisk = true
+      )
+    )
+
+    assertThat(viewHolder.itemView.findViewById<TextView>(R.id.question).text.toString())
+      .isEqualTo("Question*")
+  }
+
+  @Test
+  fun `shows optional text`() {
+    viewHolder.bind(
+      QuestionnaireViewItem(
+        Questionnaire.QuestionnaireItemComponent().apply { text = "Question" },
+        QuestionnaireResponse.QuestionnaireResponseItemComponent(),
+        validationResult = NotValidated,
+        answersChangedCallback = { _, _, _, _ -> },
+        showOptionalText = true
+      )
+    )
+
+    assertThat(
+        viewHolder.itemView.findViewById<TextView>(R.id.required_optional_text).text.toString()
+      )
+      .isEqualTo("Optional")
+  }
+
+  private val displayCategoryExtensionWithInstructionsCode =
+    Extension().apply {
+      url = EXTENSION_DISPLAY_CATEGORY_URL
+      setValue(
+        CodeableConcept().apply {
+          coding =
+            listOf(
+              Coding().apply {
+                code = INSTRUCTIONS
+                system = EXTENSION_DISPLAY_CATEGORY_SYSTEM
+              }
+            )
+        }
+      )
+    }
 }
