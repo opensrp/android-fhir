@@ -21,6 +21,7 @@ import com.google.android.fhir.db.impl.dao.LocalChangeToken
 import com.google.android.fhir.search.Search
 import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.sync.ConflictResolver
+import com.google.android.fhir.sync.DownloadState
 import java.time.OffsetDateTime
 import kotlinx.coroutines.flow.Flow
 import org.hl7.fhir.r4.model.Resource
@@ -75,8 +76,8 @@ interface FhirEngine {
    */
   suspend fun syncDownload(
     conflictResolver: ConflictResolver,
-    download: suspend () -> Flow<List<Resource>>
-  )
+    download: suspend () -> Flow<DownloadState>
+  ): Flow<DownloadState>
 
   /**
    * Returns the total count of entities available for given search.
