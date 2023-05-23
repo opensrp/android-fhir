@@ -55,6 +55,11 @@ interface FhirEngine {
    */
   suspend fun <R : Resource> search(searchQuery: SearchQuery): List<R>
 
+  suspend fun <R : Resource> searchWithRevInclude(
+    isRevInclude: Boolean,
+    search: Search
+  ): Map<R, Map<ResourceType, List<Resource>>>
+
   /**
    * Synchronizes the [upload] result in the database. [upload] operation may result in multiple
    * calls to the server to upload the data. Result of each call will be emitted by [upload] and the

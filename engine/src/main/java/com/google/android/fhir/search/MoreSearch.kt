@@ -18,6 +18,7 @@ package com.google.android.fhir.search
 
 import ca.uhn.fhir.rest.gclient.DateClientParam
 import ca.uhn.fhir.rest.gclient.NumberClientParam
+import ca.uhn.fhir.rest.gclient.ReferenceClientParam
 import ca.uhn.fhir.rest.gclient.StringClientParam
 import ca.uhn.fhir.rest.param.ParamPrefixEnum
 import com.google.android.fhir.ConverterException
@@ -34,6 +35,7 @@ import kotlin.math.roundToLong
 import org.hl7.fhir.r4.model.DateTimeType
 import org.hl7.fhir.r4.model.DateType
 import org.hl7.fhir.r4.model.Resource
+import org.hl7.fhir.r4.model.ResourceType
 
 /**
  * The multiplier used to determine the range for the `ap` search prefix. See
@@ -51,6 +53,58 @@ internal suspend fun Search.count(database: Database): Long {
 
 fun Search.getQuery(isCount: Boolean = false): SearchQuery {
   return getQuery(isCount, null)
+}
+
+internal fun Search.getIncludeQuery(isRevInclude: Boolean, includeIds: List<String>) =
+  if (isRevInclude) {
+    getRevIncludeQuery(includeIds)
+  } else getIncludeQuery(includeIds)
+
+private fun Search.getRevIncludeQuery(includeIds: List<String>): SearchQuery {
+  val match =
+    revIncludeMap
+      .map {
+        " ( a.resourceType = '${it.key}' and a.index_name IN (${it.value.joinToString { "\'${it.paramName}\'" }}) ) "
+      }
+      .joinToString(separator = "OR")
+
+  return SearchQuery(
+    query =
+      """
+    SELECT  a.index_value, b.serializedResource
+    FROM ReferenceIndexEntity a 
+    JOIN  ResourceEntity b
+    ON  a.resourceUuid = b.resourceUuid
+    AND  a.index_value IN( ${includeIds.joinToString()} ) 
+    AND ($match)
+    """.trimIndent(),
+    args = listOf()
+  )
+}
+
+private fun Search.getIncludeQuery(includeIds: List<String>): SearchQuery {
+  val match =
+    includeMap
+      .map {
+        " ( c.resourceType = '${it.key}' and b.index_name IN (${it.value.joinToString { "\'${it.paramName}\'" }}) ) "
+      }
+      .joinToString(separator = "OR")
+  //  SELECT a.resourceType||"/"||a.resourceId, c.serializedResource from ResourceEntity a
+
+  return SearchQuery(
+    query =
+      """
+    SELECT a.resourceId, c.serializedResource from ResourceEntity a 
+    JOIN ReferenceIndexEntity b 
+    On a.resourceUuid = b.resourceUuid
+    AND a.resourceType = '${type.name}'
+    AND a.resourceId in ( ${includeIds.joinToString()} ) 
+    JOIN ResourceEntity c
+    ON c.resourceType||"/"||c.resourceId = b.index_value
+    AND ($match)
+    """.trimIndent(),
+    args = listOf()
+  )
 }
 
 internal fun Search.getQuery(
@@ -166,6 +220,22 @@ internal fun Search.getQuery(
         $limitStatement)
         """
         }
+        //        revIncludeMap.isNotEmpty() -> {
+        //          """
+        //        select serializedResource from ResourceEntity where resourceUuid in (
+        //        with UUIDS as ( select '${type.name}/' || a.resourceId from ResourceEntity a
+        //        $sortJoinStatement
+        //        WHERE a.resourceType = ?
+        //        $filterStatement
+        //        $sortOrderStatement
+        //        $limitStatement
+        //        )
+        //        Select resourceUuid
+        //        FROM ResourceEntity
+        //        WHERE '${type.name}/' || resourceId in UUIDS ${revIncludeMap.toSQLQuery()}
+        //        )
+        //        """.trimIndent()
+        //        }
         else ->
           """ 
         SELECT a.serializedResource
@@ -295,7 +365,8 @@ internal fun getConditionParamPair(
       (prefix != ParamPrefixEnum.STARTS_AFTER && prefix != ParamPrefixEnum.ENDS_BEFORE)
   ) { "Prefix $prefix not allowed for Integer type" }
   return when (prefix) {
-    ParamPrefixEnum.EQUAL, null -> {
+    ParamPrefixEnum.EQUAL,
+    null -> {
       val precision = value.getRange()
       ConditionParam(
         "index_value >= ? AND index_value < ?",
@@ -441,3 +512,12 @@ private fun getApproximateDateRange(
 }
 
 private data class ApproximateDateRange(val start: Long, val end: Long)
+
+private fun Map<ResourceType, List<ReferenceClientParam>>.toSQLQuery() =
+  map { it ->
+      val indexes = it.value.joinToString { "\'${it.paramName}\'" }
+      """
+      SELECT DISTINCT resourceUuid from ReferenceIndexEntity WHERE resourceType = '${it.key}' AND index_name IN ($indexes) AND index_value IN UUIDS
+    """.trimIndent()
+    }
+    .joinToString(prefix = "\nUNION\n", separator = " \nUNION\n")
