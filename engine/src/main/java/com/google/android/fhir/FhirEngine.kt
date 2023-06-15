@@ -50,11 +50,15 @@ interface FhirEngine {
    */
   suspend fun <R : Resource> search(search: Search): List<R>
 
-
   /**
    * Searches the database and returns a list resources according to the [search] specifications.
    */
   suspend fun <R : Resource> search(searchQuery: SearchQuery): List<R>
+
+  suspend fun <R : Resource> searchWithRevInclude(
+    isRevInclude: Boolean,
+    search: Search
+  ): Map<R, Map<ResourceType, List<Resource>>>
 
   /**
    * Synchronizes the [upload] result in the database. [upload] operation may result in multiple

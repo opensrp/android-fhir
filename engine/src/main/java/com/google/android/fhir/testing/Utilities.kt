@@ -141,6 +141,13 @@ object TestFhirEngineImpl : FhirEngine {
     return emptyList()
   }
 
+  override suspend fun <R : Resource> searchWithRevInclude(
+    isRevInclude: Boolean,
+    search: Search
+  ): Map<R, Map<ResourceType, List<Resource>>> {
+    TODO("Not yet implemented")
+  }
+
   override suspend fun syncUpload(
     upload: suspend (List<LocalChange>) -> Flow<Pair<LocalChangeToken, Resource>>
   ) {
