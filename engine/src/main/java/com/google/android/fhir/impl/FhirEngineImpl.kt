@@ -148,75 +148,78 @@ internal class FhirEngineImpl(private val database: Database, private val contex
   ): Flow<DownloadState> =
     download().onEach {
       if (it is DownloadState.Success) {
-        database.withTransaction {
-          val resolved =
-            resolveConflictingResources(
-              it.resources,
-              getConflictingResourceIds(it.resources),
-              conflictResolver
-            )
-          database.insertSyncedResources(it.resources)
-          saveResolvedResourcesToDatabase(resolved)
-        }
-      }
-    }
-
-  private suspend fun saveResolvedResourcesToDatabase(resolved: List<Resource>?) {
-    resolved?.let {
-      database.deleteUpdates(it)
-      database.update(*it.toTypedArray())
-    }
-  }
-
-  private suspend fun resolveConflictingResources(
-    resources: List<Resource>,
-    conflictingResourceIds: Set<String>,
-    conflictResolver: ConflictResolver
-  ) =
-    resources
-      .filter { conflictingResourceIds.contains(it.logicalId) }
-      .map { conflictResolver.resolve(database.select(it.resourceType, it.logicalId), it) }
-      .filterIsInstance<Resolved>()
-      .map { it.resolved }
-      .takeIf { it.isNotEmpty() }
-
-  private suspend fun getConflictingResourceIds(resources: List<Resource>) =
-    resources
-      .map { it.logicalId }
-      .toSet()
-      .intersect(database.getAllLocalChanges().map { it.localChange.resourceId }.toSet())
-
-  override suspend fun syncUpload(
-    upload: suspend (List<LocalChange>) -> Flow<Pair<LocalChangeToken, Resource>>
-  ) {
-    val localChanges = database.getAllLocalChanges()
-    if (localChanges.isNotEmpty()) {
-      upload(localChanges.map { it.toLocalChange() }).collect {
-        database.deleteUpdates(it.first)
-        when (it.second) {
-          is Bundle -> updateVersionIdAndLastUpdated(it.second as Bundle)
-          else -> updateVersionIdAndLastUpdated(it.second)
-        }
-      }
-    }
-  }
-
-  private suspend fun updateVersionIdAndLastUpdated(bundle: Bundle) {
-    when (bundle.type) {
-      Bundle.BundleType.TRANSACTIONRESPONSE -> {
-        bundle.entry.forEach {
-          when {
-            it.hasResource() -> updateVersionIdAndLastUpdated(it.resource)
-            it.hasResponse() -> updateVersionIdAndLastUpdated(it.response)
+        try {
+          database.withTransaction {
+            val resolved =
+              resolveConflictingResources(
+                it.resources,
+                getConflictingResourceIds(it.resources),
+                conflictResolver
+              )
+            database.insertSyncedResources(it.resources)
+            saveResolvedResourcesToDatabase(resolved)
           }
+        } catch (exception: Exception) {
+          Timber.e(exception, "Error encountered while inserting synced resources")
         }
       }
-      else -> {
-        // Leave it for now.
-        Timber.i("Received request to update meta values for ${bundle.type}")
-      }
     }
-  }
+            private suspend fun saveResolvedResourcesToDatabase(resolved: List<Resource>?) {
+              resolved?.let {
+                database.deleteUpdates(it)
+                database.update(*it.toTypedArray())
+              }
+            }
+
+            private suspend fun resolveConflictingResources(
+              resources: List<Resource>,
+              conflictingResourceIds: Set<String>,
+              conflictResolver: ConflictResolver
+            ) =
+              resources
+                .filter { conflictingResourceIds.contains(it.logicalId) }
+                .map { conflictResolver.resolve(database.select(it.resourceType, it.logicalId), it) }
+                .filterIsInstance<Resolved>()
+                .map { it.resolved }
+                .takeIf { it.isNotEmpty() }
+
+            private suspend fun getConflictingResourceIds(resources: List<Resource>) =
+              resources
+                .map { it.logicalId }
+                .toSet()
+                .intersect(database.getAllLocalChanges().map { it.localChange.resourceId }.toSet())
+
+            override suspend fun syncUpload(
+              upload: suspend (List<LocalChange>) -> Flow<Pair<LocalChangeToken, Resource>>
+            ) {
+              val localChanges = database.getAllLocalChanges()
+              if (localChanges.isNotEmpty()) {
+                upload(localChanges.map { it.toLocalChange() }).collect {
+                  database.deleteUpdates(it.first)
+                  when (it.second) {
+                    is Bundle -> updateVersionIdAndLastUpdated(it.second as Bundle)
+                    else -> updateVersionIdAndLastUpdated(it.second)
+                  }
+                }
+              }
+            }
+
+            private suspend fun updateVersionIdAndLastUpdated(bundle: Bundle) {
+              when (bundle.type) {
+                Bundle.BundleType.TRANSACTIONRESPONSE -> {
+                  bundle.entry.forEach {
+                    when {
+                      it.hasResource() -> updateVersionIdAndLastUpdated(it.resource)
+                      it.hasResponse() -> updateVersionIdAndLastUpdated(it.response)
+                    }
+                  }
+                }
+                else -> {
+                  // Leave it for now.
+                  Timber.i("Received request to update meta values for ${bundle.type}")
+                }
+              }
+            }
 
   private suspend fun updateVersionIdAndLastUpdated(response: Bundle.BundleEntryResponseComponent) {
     if (response.hasEtag() && response.hasLastModified() && response.hasLocation()) {
