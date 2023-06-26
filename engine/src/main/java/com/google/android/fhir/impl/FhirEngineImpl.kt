@@ -66,9 +66,10 @@ internal class FhirEngineImpl(private val database: Database, private val contex
     return search.execute(database)
   }
 
-  override suspend fun getUnsyncedLocalChanges() : List<SquashedLocalChange> = database.getAllLocalChanges()
+  override suspend fun getUnsyncedLocalChanges(): List<SquashedLocalChange> =
+    database.getAllLocalChanges()
 
-/*
+  /*
   suspend fun sample(dateFrom: Long, limit: Long) {
 
     val searchQuery =
@@ -168,62 +169,62 @@ internal class FhirEngineImpl(private val database: Database, private val contex
         }
       }
     }
-            private suspend fun saveResolvedResourcesToDatabase(resolved: List<Resource>?) {
-              resolved?.let {
-                database.deleteUpdates(it)
-                database.update(*it.toTypedArray())
-              }
-            }
+  private suspend fun saveResolvedResourcesToDatabase(resolved: List<Resource>?) {
+    resolved?.let {
+      database.deleteUpdates(it)
+      database.update(*it.toTypedArray())
+    }
+  }
 
-            private suspend fun resolveConflictingResources(
-              resources: List<Resource>,
-              conflictingResourceIds: Set<String>,
-              conflictResolver: ConflictResolver
-            ) =
-              resources
-                .filter { conflictingResourceIds.contains(it.logicalId) }
-                .map { conflictResolver.resolve(database.select(it.resourceType, it.logicalId), it) }
-                .filterIsInstance<Resolved>()
-                .map { it.resolved }
-                .takeIf { it.isNotEmpty() }
+  private suspend fun resolveConflictingResources(
+    resources: List<Resource>,
+    conflictingResourceIds: Set<String>,
+    conflictResolver: ConflictResolver
+  ) =
+    resources
+      .filter { conflictingResourceIds.contains(it.logicalId) }
+      .map { conflictResolver.resolve(database.select(it.resourceType, it.logicalId), it) }
+      .filterIsInstance<Resolved>()
+      .map { it.resolved }
+      .takeIf { it.isNotEmpty() }
 
-            private suspend fun getConflictingResourceIds(resources: List<Resource>) =
-              resources
-                .map { it.logicalId }
-                .toSet()
-                .intersect(database.getAllLocalChanges().map { it.localChange.resourceId }.toSet())
+  private suspend fun getConflictingResourceIds(resources: List<Resource>) =
+    resources
+      .map { it.logicalId }
+      .toSet()
+      .intersect(database.getAllLocalChanges().map { it.localChange.resourceId }.toSet())
 
-            override suspend fun syncUpload(
-              upload: suspend (List<LocalChange>) -> Flow<Pair<LocalChangeToken, Resource>>
-            ) {
-              val localChanges = database.getAllLocalChanges()
-              if (localChanges.isNotEmpty()) {
-                upload(localChanges.map { it.toLocalChange() }).collect {
-                  database.deleteUpdates(it.first)
-                  when (it.second) {
-                    is Bundle -> updateVersionIdAndLastUpdated(it.second as Bundle)
-                    else -> updateVersionIdAndLastUpdated(it.second)
-                  }
-                }
-              }
-            }
+  override suspend fun syncUpload(
+    upload: suspend (List<LocalChange>) -> Flow<Pair<LocalChangeToken, Resource>>
+  ) {
+    val localChanges = database.getAllLocalChanges()
+    if (localChanges.isNotEmpty()) {
+      upload(localChanges.map { it.toLocalChange() }).collect {
+        database.deleteUpdates(it.first)
+        when (it.second) {
+          is Bundle -> updateVersionIdAndLastUpdated(it.second as Bundle)
+          else -> updateVersionIdAndLastUpdated(it.second)
+        }
+      }
+    }
+  }
 
-            private suspend fun updateVersionIdAndLastUpdated(bundle: Bundle) {
-              when (bundle.type) {
-                Bundle.BundleType.TRANSACTIONRESPONSE -> {
-                  bundle.entry.forEach {
-                    when {
-                      it.hasResource() -> updateVersionIdAndLastUpdated(it.resource)
-                      it.hasResponse() -> updateVersionIdAndLastUpdated(it.response)
-                    }
-                  }
-                }
-                else -> {
-                  // Leave it for now.
-                  Timber.i("Received request to update meta values for ${bundle.type}")
-                }
-              }
-            }
+  private suspend fun updateVersionIdAndLastUpdated(bundle: Bundle) {
+    when (bundle.type) {
+      Bundle.BundleType.TRANSACTIONRESPONSE -> {
+        bundle.entry.forEach {
+          when {
+            it.hasResource() -> updateVersionIdAndLastUpdated(it.resource)
+            it.hasResponse() -> updateVersionIdAndLastUpdated(it.response)
+          }
+        }
+      }
+      else -> {
+        // Leave it for now.
+        Timber.i("Received request to update meta values for ${bundle.type}")
+      }
+    }
+  }
 
   private suspend fun updateVersionIdAndLastUpdated(response: Bundle.BundleEntryResponseComponent) {
     if (response.hasEtag() && response.hasLastModified() && response.hasLocation()) {

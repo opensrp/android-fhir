@@ -1,18 +1,18 @@
 /*
-* Copyright 2022 Google LLC
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*       http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2022 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package com.google.android.fhir.datacapture.extensions
 
@@ -54,1640 +54,1591 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [Build.VERSION_CODES.P], application = DataCaptureTestApplication::class)
 class MoreQuestionnaireItemComponentsTest {
 
-@Before
-fun setUp() {
-ReflectionHelpers.setStaticField(DataCapture::class.java, "configuration", null)
-}
-
-@Test
-fun itemControl_shouldReturnItemControlCodeDropDown() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.CHOICE
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(ItemControlTypes.DROP_DOWN.extensionCode)
-	    .setDisplay("Drop Down")
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.itemControl).isEqualTo(ItemControlTypes.DROP_DOWN)
-}
-
-@Test
-fun itemControl_shouldReturnItemControlCodeRadioButton() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.CHOICE
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(ItemControlTypes.RADIO_BUTTON.extensionCode)
-	    .setDisplay("Radio Group")
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.itemControl).isEqualTo(ItemControlTypes.RADIO_BUTTON)
-}
-
-@Test
-fun itemControl_shouldReturnItemControlCodePhoneNumber() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.STRING
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL_ANDROID_FHIR)
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(ItemControlTypes.PHONE_NUMBER.extensionCode)
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM_ANDROID_FHIR)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.itemControl).isEqualTo(ItemControlTypes.PHONE_NUMBER)
-}
-
-@Test
-fun itemControl_wrongExtensionUrl_shouldReturnNull() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.CHOICE
-addExtension(
-  Extension()
-    .setUrl("null-test")
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(ItemControlTypes.DROP_DOWN.extensionCode)
-	    .setDisplay("Drop Down")
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.itemControl).isNull()
-}
-
-@Test
-fun itemControl_wrongExtensionCoding_shouldReturnNull() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.CHOICE
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode("null-test")
-	    .setDisplay("Drop Down")
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.itemControl).isNull()
-}
-
-@Test
-fun `displayItemControl should return flyover type`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.STRING
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(DisplayItemControlType.FLYOVER.extensionCode)
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.displayItemControl).isEqualTo(DisplayItemControlType.FLYOVER)
-}
-
-@Test
-fun `isFlyoverCode should return true`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.DISPLAY
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(DisplayItemControlType.FLYOVER.extensionCode)
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.isFlyoverCode).isTrue()
-}
-
-@Test
-fun `isFlyoverCode item returns false if type is not display`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.STRING
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(DisplayItemControlType.FLYOVER.extensionCode)
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.isFlyoverCode).isFalse()
-}
-
-@Test
-fun `isFlyoverCode item returns false if code is not flyover`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.STRING
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(Coding().setCode("random-code").setSystem(EXTENSION_ITEM_CONTROL_SYSTEM))
-    )
-)
-}
-
-assertThat(questionnaireItem.isFlyoverCode).isFalse()
-}
-
-@Test
-fun `displayItemControl should return page type`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.STRING
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(DisplayItemControlType.PAGE.extensionCode)
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.displayItemControl).isEqualTo(DisplayItemControlType.PAGE)
-}
-
-@Test
-fun `displayItemControl should return help`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.STRING
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(DisplayItemControlType.HELP.extensionCode)
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.displayItemControl).isEqualTo(DisplayItemControlType.HELP)
-}
-
-@Test
-fun `help button is visible if questionnaireItem has helpCode`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-item =
-  listOf(
-    Questionnaire.QuestionnaireItemComponent().apply {
-      type = Questionnaire.QuestionnaireItemType.DISPLAY
-      addExtension(
-	Extension()
-	  .setUrl(EXTENSION_ITEM_CONTROL_URL)
-	  .setValue(
-	    CodeableConcept()
-	      .addCoding(
-		Coding()
-		  .setCode(DisplayItemControlType.HELP.extensionCode)
-		  .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	      )
-	  )
-      )
-    }
-  )
-}
-
-assertThat(questionnaireItem.hasHelpButton).isTrue()
-}
-
-@Test
-fun `help button is hidden if questionnaireItem does not have helpCode`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-item =
-  listOf(
-    Questionnaire.QuestionnaireItemComponent().apply {
-      type = Questionnaire.QuestionnaireItemType.DISPLAY
-      addExtension(
-	Extension()
-	  .setUrl(EXTENSION_ITEM_CONTROL_URL)
-	  .setValue(
-	    CodeableConcept()
-	      .addCoding(
-		Coding()
-		  .setCode(DisplayItemControlType.FLYOVER.extensionCode)
-		  .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	      )
-	  )
-      )
-    }
-  )
-}
-
-assertThat(questionnaireItem.hasHelpButton).isFalse()
-}
-
-@Test
-fun `isHelpCode returns true if displayItemControl is help`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.DISPLAY
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(DisplayItemControlType.HELP.extensionCode)
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.isHelpCode).isTrue()
-}
-
-@Test
-fun `isHelpCode returns false if displayItemControl is not help`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.DISPLAY
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(DisplayItemControlType.PAGE.extensionCode)
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.isHelpCode).isFalse()
-}
-
-@Test
-fun `displayItemControl should return null if the extension url is missing`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.STRING
-addExtension(
-  Extension()
-    .setValue(
-      CodeableConcept()
-	.addCoding(
-	  Coding()
-	    .setCode(DisplayItemControlType.PAGE.extensionCode)
-	    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
-	)
-    )
-)
-}
-
-assertThat(questionnaireItem.displayItemControl).isNull()
-}
-
-@Test
-fun `displayItemControl should return null if the extension system is missing`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-type = Questionnaire.QuestionnaireItemType.STRING
-addExtension(
-  Extension()
-    .setUrl(EXTENSION_ITEM_CONTROL_URL)
-    .setValue(
-      CodeableConcept()
-	.addCoding(Coding().setCode(DisplayItemControlType.PAGE.extensionCode))
-    )
-)
-}
-
-assertThat(questionnaireItem.displayItemControl).isNull()
-}
-
-@Test
-fun choiceOrientation_shouldReturnVertical() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(
-  EXTENSION_CHOICE_ORIENTATION_URL,
-  CodeType(ChoiceOrientationTypes.VERTICAL.extensionCode)
-)
-}
-assertThat(questionnaireItem.choiceOrientation).isEqualTo(ChoiceOrientationTypes.VERTICAL)
-}
-
-@Test
-fun choiceOrientation_shouldReturnHorizontal() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(
-  EXTENSION_CHOICE_ORIENTATION_URL,
-  CodeType(ChoiceOrientationTypes.HORIZONTAL.extensionCode)
-)
-}
-assertThat(questionnaireItem.choiceOrientation).isEqualTo(ChoiceOrientationTypes.HORIZONTAL)
-}
-
-@Test
-fun choiceOrientation_missingExtension_shouldReturnNull() {
-val questionnaireItem = Questionnaire.QuestionnaireItemComponent()
-assertThat(questionnaireItem.choiceOrientation).isNull()
-}
-
-@Test
-fun choiceOrientation_missingOrientation_shouldReturnNull() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_CHOICE_ORIENTATION_URL, CodeType(""))
-}
-assertThat(questionnaireItem.choiceOrientation).isNull()
-}
-
-@Test
-fun mimeTypes_shouldReturnMimeTypes() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MIME_TYPE, CodeType("image/jpg"))
-addExtension(EXTENSION_MIME_TYPE, CodeType("application/pdf"))
-}
-assertThat(questionnaireItem.mimeTypes).isEqualTo(listOf("image/jpg", "application/pdf"))
-}
-
-@Test
-fun mimeTypes_missingMimeType_shouldReturnEmpty() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MIME_TYPE, CodeType(""))
-}
-assertThat(questionnaireItem.mimeTypes).isEmpty()
-}
-
-@Test
-fun mimeTypes_missingExtension_shouldReturnNull() {
-val questionnaireItem = Questionnaire.QuestionnaireItemComponent()
-assertThat(questionnaireItem.mimeTypes).isEmpty()
-}
-
-@Test
-fun `should return max size in bytes`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
-}
-assertThat(questionnaireItem.maxSizeInBytes).isEqualTo(BigDecimal(5242880))
-}
-
-@Test
-fun `should return max size in kibibytes`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
-}
-assertThat(questionnaireItem.maxSizeInKiBs).isEqualTo(BigDecimal(5120))
-}
-
-@Test
-fun `should return max size in mebibytes`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
-}
-assertThat(questionnaireItem.maxSizeInMiBs).isEqualTo(BigDecimal(5))
-}
-
-@Test
-fun `should return null for max size in bytes`() {
-assertThat(Questionnaire.QuestionnaireItemComponent().maxSizeInBytes).isNull()
-}
-
-@Test
-fun `should return null for max size in kibibytes`() {
-assertThat(Questionnaire.QuestionnaireItemComponent().maxSizeInKiBs).isNull()
-}
-
-@Test
-fun `should return null for max size in mebibytes`() {
-assertThat(Questionnaire.QuestionnaireItemComponent().maxSizeInMiBs).isNull()
-}
-
-@Test
-fun `should return false if given size is below maximum size allowed`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
-}
-assertThat(questionnaireItem.isGivenSizeOverLimit(BigDecimal(10))).isFalse()
-}
-
-@Test
-fun `should return true if given size is above maximum size allowed`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
-}
-assertThat(questionnaireItem.isGivenSizeOverLimit(BigDecimal(52428809))).isTrue()
-}
-
-@Test
-fun mimeType_size_shouldReturnNumberOfSupportedMimeTypes() {
-assertThat(MimeType.values().size).isEqualTo(4)
-}
-
-@Test
-fun hasMimeType_shouldReturnTrue() {
-val questionnaire =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MIME_TYPE, CodeType("image/jpg"))
-addExtension(EXTENSION_MIME_TYPE, CodeType("application/pdf"))
-}
-assertThat(questionnaire.hasMimeType(MimeType.IMAGE.value)).isTrue()
-}
-
-@Test
-fun hasMimeType_shouldReturnFalse() {
-val questionnaire =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MIME_TYPE, CodeType("image/jpg"))
-addExtension(EXTENSION_MIME_TYPE, CodeType("application/pdf"))
-}
-assertThat(questionnaire.hasMimeType(MimeType.VIDEO.value)).isFalse()
-}
-
-@Test
-fun hasMimeTypeOnly_shouldReturnTrue() {
-val questionnaire =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MIME_TYPE, CodeType("image/jpg"))
-addExtension(EXTENSION_MIME_TYPE, CodeType("image/png"))
-}
-assertThat(questionnaire.hasMimeTypeOnly(MimeType.IMAGE.value)).isTrue()
-}
-
-@Test
-fun hasMimeTypeOnly_shouldReturnFalse() {
-val questionnaire =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MIME_TYPE, CodeType("image/jpg"))
-addExtension(EXTENSION_MIME_TYPE, CodeType("application/pdf"))
-}
-assertThat(questionnaire.hasMimeTypeOnly(MimeType.IMAGE.value)).isFalse()
-}
-
-@Test
-fun maxSize_shouldReturnBytes() {
-val questionnaire =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
-}
-assertThat(questionnaire.maxSizeInBytes).isEqualTo(BigDecimal(5242880))
-}
-
-@Test
-fun maxSize_shouldReturnKibibytes() {
-val questionnaire =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
-}
-assertThat(questionnaire.maxSizeInKiBs).isEqualTo(BigDecimal(5120))
-}
-
-@Test
-fun maxSize_shouldReturnMebibytes() {
-val questionnaire =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
-}
-assertThat(questionnaire.maxSizeInMiBs).isEqualTo(BigDecimal(5))
-}
-
-@Test
-fun maxSizeInByte_missingExtension_shouldReturnNull() {
-val questionnaire = Questionnaire.QuestionnaireItemComponent()
-assertThat(questionnaire.maxSizeInBytes).isNull()
-}
-
-@Test
-fun maxSizeInKiB_missingExtension_shouldReturnNull() {
-val questionnaire = Questionnaire.QuestionnaireItemComponent()
-assertThat(questionnaire.maxSizeInKiBs).isNull()
-}
-
-@Test
-fun maxSizeInMiB_missingExtension_shouldReturnNull() {
-val questionnaire = Questionnaire.QuestionnaireItemComponent()
-assertThat(questionnaire.maxSizeInMiBs).isNull()
-}
-
-@Test
-fun localizedTextSpanned_noText_shouldReturnNull() {
-assertThat(Questionnaire.QuestionnaireItemComponent().localizedTextSpanned).isNull()
-}
-
-@Test
-fun localizedTextSpanned_shouldReturnText() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-text = "Patient Information in <strong>strong</strong>"
-}
-Locale.setDefault(Locale.US)
-assertThat(questionnaireItem.localizedTextSpanned.toString())
-.isEqualTo("Patient Information in strong")
-}
-
-@Test
-fun localizedTextSpanned_nonMatchingLocale_shouldReturnText() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-text = "Patient Information"
-textElement.apply {
-  addExtension(
-    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-      addExtension(Extension("lang", StringType("vi-VN")))
-      addExtension(Extension("content", StringType("Thông tin bệnh nhân")))
-    }
-  )
-}
-}
-Locale.setDefault(Locale.US)
-
-assertThat(questionnaireItem.localizedTextSpanned.toString()).isEqualTo("Patient Information")
-}
-
-@Test
-fun localizedTextSpanned_matchingLocale_shouldReturnLocalizedText() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-text = "Patient Information"
-textElement.apply {
-  addExtension(
-    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-      addExtension(Extension("lang", StringType("vi-VN")))
-      addExtension(Extension("content", StringType("Thông tin bệnh nhân")))
-    }
-  )
-}
-}
-Locale.setDefault(Locale.forLanguageTag("vi-VN"))
-
-assertThat(questionnaireItem.localizedTextSpanned.toString()).isEqualTo("Thông tin bệnh nhân")
-}
-
-@Test
-fun localizedTextSpanned_matchingLocaleWithoutCountryCode_shouldReturnLocalizedText() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-text = "Patient Information"
-textElement.apply {
-  addExtension(
-    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-      addExtension(Extension("lang", StringType("vi")))
-      addExtension(Extension("content", StringType("Thông tin bệnh nhân")))
-    }
-  )
-}
-}
-Locale.setDefault(Locale.forLanguageTag("vi-VN"))
-
-assertThat(questionnaireItem.localizedTextSpanned.toString()).isEqualTo("Thông tin bệnh nhân")
-}
-
-@Test
-fun localizedPrefixSpanned_noPrefix_shouldReturnNull() {
-val questionnaireItem = Questionnaire.QuestionnaireItemComponent()
-
-assertThat(questionnaireItem.localizedPrefixSpanned).isNull()
-}
-
-@Test
-fun localizedPrefixSpanned_shouldReturnPrefix() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply { prefix = "One in <strong>strong</strong>" }
-Locale.setDefault(Locale.US)
-
-assertThat(questionnaireItem.localizedPrefixSpanned.toString()).isEqualTo("One in strong")
-}
-
-@Test
-fun localizedPrefixSpanned_nonMatchingLocale_shouldReturnText() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-prefix = "One"
-prefixElement.apply {
-  addExtension(
-    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-      addExtension(Extension("lang", StringType("vi-VN")))
-      addExtension(Extension("content", StringType("Một")))
-    }
-  )
-}
-}
-Locale.setDefault(Locale.US)
-
-assertThat(questionnaireItem.localizedPrefixSpanned.toString()).isEqualTo("One")
-}
-
-@Test
-fun localizedPrefixSpanned_matchingLocale_shouldReturnLocalizedText() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-prefix = "One"
-prefixElement.apply {
-  addExtension(
-    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-      addExtension(Extension("lang", StringType("vi-VN")))
-      addExtension(Extension("content", StringType("Một")))
-    }
-  )
-}
-}
-Locale.setDefault(Locale.forLanguageTag("vi-VN"))
-
-assertThat(questionnaireItem.localizedPrefixSpanned.toString()).isEqualTo("Một")
-}
-
-@Test
-fun localizedPrefixSpanned_matchingLocaleWithoutCountryCode_shouldReturnLocalizedText() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-prefix = "One"
-prefixElement.apply {
-  addExtension(
-    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-      addExtension(Extension("lang", StringType("vi")))
-      addExtension(Extension("content", StringType("Một")))
-    }
-  )
-}
-}
-Locale.setDefault(Locale.forLanguageTag("vi-VN"))
-
-assertThat(questionnaireItem.localizedPrefixSpanned.toString()).isEqualTo("Một")
-}
-
-@Test
-fun `nested display item without instructions code returns null`() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
+  @Before
+  fun setUp() {
+    ReflectionHelpers.setStaticField(DataCapture::class.java, "configuration", null)
+  }
+
+  @Test
+  fun itemControl_shouldReturnItemControlCodeDropDown() {
+    val questionnaireItem =
       Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "text"
+        type = Questionnaire.QuestionnaireItemType.CHOICE
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(ItemControlTypes.DROP_DOWN.extensionCode)
+                    .setDisplay("Drop Down")
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
       }
-    )
-}
-)
 
-assertThat(questionItemList.first().localizedInstructionsSpanned).isNull()
-}
+    assertThat(questionnaireItem.itemControl).isEqualTo(ItemControlTypes.DROP_DOWN)
+  }
 
-@Test
-fun `localizedInstructionsSpanned returns text`() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
+  @Test
+  fun itemControl_shouldReturnItemControlCodeRadioButton() {
+    val questionnaireItem =
       Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "subtitle text"
-	extension = listOf(displayCategoryExtensionWithInstructionsCode)
-	type = Questionnaire.QuestionnaireItemType.DISPLAY
+        type = Questionnaire.QuestionnaireItemType.CHOICE
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(ItemControlTypes.RADIO_BUTTON.extensionCode)
+                    .setDisplay("Radio Group")
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
       }
-    )
-}
-)
-Locale.setDefault(Locale.US)
 
-assertThat(questionItemList.first().localizedInstructionsSpanned.toString())
-.isEqualTo("subtitle text")
-}
+    assertThat(questionnaireItem.itemControl).isEqualTo(ItemControlTypes.RADIO_BUTTON)
+  }
 
-@Test
-fun `localizedInstructionsSpanned returns text for non matching locale`() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
+  @Test
+  fun itemControl_shouldReturnItemControlCodePhoneNumber() {
+    val questionnaireItem =
       Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "subtitle text"
-	textElement.apply {
-	  addExtension(
-	    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-	      addExtension(Extension("lang", StringType("vi-VN")))
-	      addExtension(Extension("content", StringType("phụ đề")))
-	    }
-	  )
-	}
-	extension = listOf(displayCategoryExtensionWithInstructionsCode)
-	type = Questionnaire.QuestionnaireItemType.DISPLAY
+        type = Questionnaire.QuestionnaireItemType.STRING
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL_ANDROID_FHIR)
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(ItemControlTypes.PHONE_NUMBER.extensionCode)
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM_ANDROID_FHIR)
+                )
+            )
+        )
       }
-    )
-}
-)
-Locale.setDefault(Locale.US)
 
-assertThat(questionItemList.first().localizedInstructionsSpanned.toString())
-.isEqualTo("subtitle text")
-}
+    assertThat(questionnaireItem.itemControl).isEqualTo(ItemControlTypes.PHONE_NUMBER)
+  }
 
-@Test
-fun `localizedInstructionsSpanned returns localized text for matching locale`() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
+  @Test
+  fun itemControl_wrongExtensionUrl_shouldReturnNull() {
+    val questionnaireItem =
       Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "subtitle text"
-	textElement.apply {
-	  addExtension(
-	    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-	      addExtension(Extension("lang", StringType("vi-VN")))
-	      addExtension(Extension("content", StringType("phụ đề")))
-	    }
-	  )
-	}
-	extension = listOf(displayCategoryExtensionWithInstructionsCode)
-	type = Questionnaire.QuestionnaireItemType.DISPLAY
+        type = Questionnaire.QuestionnaireItemType.CHOICE
+        addExtension(
+          Extension()
+            .setUrl("null-test")
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(ItemControlTypes.DROP_DOWN.extensionCode)
+                    .setDisplay("Drop Down")
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
       }
-    )
-}
-)
-Locale.setDefault(Locale.forLanguageTag("vi-VN"))
 
-assertThat(questionItemList.first().localizedInstructionsSpanned.toString()).isEqualTo("phụ đề")
-}
+    assertThat(questionnaireItem.itemControl).isNull()
+  }
 
-@Test
-fun `localizedInstructionsSpanned returns localized text for matching locale without country code`() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
+  @Test
+  fun itemControl_wrongExtensionCoding_shouldReturnNull() {
+    val questionnaireItem =
       Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "subtitle text"
-	textElement.apply {
-	  addExtension(
-	    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-	      addExtension(Extension("lang", StringType("vi")))
-	      addExtension(Extension("content", StringType("phụ đề")))
-	    }
-	  )
-	}
-	extension = listOf(displayCategoryExtensionWithInstructionsCode)
-	type = Questionnaire.QuestionnaireItemType.DISPLAY
+        type = Questionnaire.QuestionnaireItemType.CHOICE
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode("null-test")
+                    .setDisplay("Drop Down")
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
       }
-    )
-}
-)
-Locale.setDefault(Locale.forLanguageTag("vi-VN"))
 
-assertThat(questionItemList.first().localizedInstructionsSpanned.toString()).isEqualTo("phụ đề")
-}
+    assertThat(questionnaireItem.itemControl).isNull()
+  }
 
-@Test
-fun `isInstructionsCode returns true`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "nested-display-question"
-text = "subtitle text"
-extension = listOf(displayCategoryExtensionWithInstructionsCode)
-type = Questionnaire.QuestionnaireItemType.DISPLAY
-}
-assertThat(questionnaireItem.isInstructionsCode).isTrue()
-}
+  @Test
+  fun `displayItemControl should return flyover type`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        type = Questionnaire.QuestionnaireItemType.STRING
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(DisplayItemControlType.FLYOVER.extensionCode)
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
+      }
 
-@Test
-fun `isInstructionsCode returns false if item type is not display`() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "nested-display-question"
-text = "subtitle text"
-extension = listOf(displayCategoryExtensionWithInstructionsCode)
-type = Questionnaire.QuestionnaireItemType.STRING
-}
-assertThat(questionnaireItem.isInstructionsCode).isFalse()
-}
+    assertThat(questionnaireItem.displayItemControl).isEqualTo(DisplayItemControlType.FLYOVER)
+  }
 
-@Test
-fun `isInstructionsCode returns false if instructions code is not present`() {
-val displayCategoryExtension =
-Extension().apply {
-url = EXTENSION_DISPLAY_CATEGORY_URL
-setValue(
-  CodeableConcept().apply {
-    coding =
+  @Test
+  fun `isFlyoverCode should return true`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        type = Questionnaire.QuestionnaireItemType.DISPLAY
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(DisplayItemControlType.FLYOVER.extensionCode)
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
+      }
+
+    assertThat(questionnaireItem.isFlyoverCode).isTrue()
+  }
+
+  @Test
+  fun `isFlyoverCode item returns false if type is not display`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        type = Questionnaire.QuestionnaireItemType.STRING
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(DisplayItemControlType.FLYOVER.extensionCode)
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
+      }
+
+    assertThat(questionnaireItem.isFlyoverCode).isFalse()
+  }
+
+  @Test
+  fun `isFlyoverCode item returns false if code is not flyover`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        type = Questionnaire.QuestionnaireItemType.STRING
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(Coding().setCode("random-code").setSystem(EXTENSION_ITEM_CONTROL_SYSTEM))
+            )
+        )
+      }
+
+    assertThat(questionnaireItem.isFlyoverCode).isFalse()
+  }
+
+  @Test
+  fun `displayItemControl should return page type`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        type = Questionnaire.QuestionnaireItemType.STRING
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(DisplayItemControlType.PAGE.extensionCode)
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
+      }
+
+    assertThat(questionnaireItem.displayItemControl).isEqualTo(DisplayItemControlType.PAGE)
+  }
+
+  @Test
+  fun `displayItemControl should return help`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        type = Questionnaire.QuestionnaireItemType.STRING
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(DisplayItemControlType.HELP.extensionCode)
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
+      }
+
+    assertThat(questionnaireItem.displayItemControl).isEqualTo(DisplayItemControlType.HELP)
+  }
+
+  @Test
+  fun `help button is visible if questionnaireItem has helpCode`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        item =
+          listOf(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              type = Questionnaire.QuestionnaireItemType.DISPLAY
+              addExtension(
+                Extension()
+                  .setUrl(EXTENSION_ITEM_CONTROL_URL)
+                  .setValue(
+                    CodeableConcept()
+                      .addCoding(
+                        Coding()
+                          .setCode(DisplayItemControlType.HELP.extensionCode)
+                          .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                      )
+                  )
+              )
+            }
+          )
+      }
+
+    assertThat(questionnaireItem.hasHelpButton).isTrue()
+  }
+
+  @Test
+  fun `help button is hidden if questionnaireItem does not have helpCode`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        item =
+          listOf(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              type = Questionnaire.QuestionnaireItemType.DISPLAY
+              addExtension(
+                Extension()
+                  .setUrl(EXTENSION_ITEM_CONTROL_URL)
+                  .setValue(
+                    CodeableConcept()
+                      .addCoding(
+                        Coding()
+                          .setCode(DisplayItemControlType.FLYOVER.extensionCode)
+                          .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                      )
+                  )
+              )
+            }
+          )
+      }
+
+    assertThat(questionnaireItem.hasHelpButton).isFalse()
+  }
+
+  @Test
+  fun `isHelpCode returns true if displayItemControl is help`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        type = Questionnaire.QuestionnaireItemType.DISPLAY
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(DisplayItemControlType.HELP.extensionCode)
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
+      }
+
+    assertThat(questionnaireItem.isHelpCode).isTrue()
+  }
+
+  @Test
+  fun `isHelpCode returns false if displayItemControl is not help`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        type = Questionnaire.QuestionnaireItemType.DISPLAY
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(DisplayItemControlType.PAGE.extensionCode)
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
+      }
+
+    assertThat(questionnaireItem.isHelpCode).isFalse()
+  }
+
+  @Test
+  fun `displayItemControl should return null if the extension url is missing`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        type = Questionnaire.QuestionnaireItemType.STRING
+        addExtension(
+          Extension()
+            .setValue(
+              CodeableConcept()
+                .addCoding(
+                  Coding()
+                    .setCode(DisplayItemControlType.PAGE.extensionCode)
+                    .setSystem(EXTENSION_ITEM_CONTROL_SYSTEM)
+                )
+            )
+        )
+      }
+
+    assertThat(questionnaireItem.displayItemControl).isNull()
+  }
+
+  @Test
+  fun `displayItemControl should return null if the extension system is missing`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        type = Questionnaire.QuestionnaireItemType.STRING
+        addExtension(
+          Extension()
+            .setUrl(EXTENSION_ITEM_CONTROL_URL)
+            .setValue(
+              CodeableConcept()
+                .addCoding(Coding().setCode(DisplayItemControlType.PAGE.extensionCode))
+            )
+        )
+      }
+
+    assertThat(questionnaireItem.displayItemControl).isNull()
+  }
+
+  @Test
+  fun choiceOrientation_shouldReturnVertical() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(
+          EXTENSION_CHOICE_ORIENTATION_URL,
+          CodeType(ChoiceOrientationTypes.VERTICAL.extensionCode)
+        )
+      }
+    assertThat(questionnaireItem.choiceOrientation).isEqualTo(ChoiceOrientationTypes.VERTICAL)
+  }
+
+  @Test
+  fun choiceOrientation_shouldReturnHorizontal() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(
+          EXTENSION_CHOICE_ORIENTATION_URL,
+          CodeType(ChoiceOrientationTypes.HORIZONTAL.extensionCode)
+        )
+      }
+    assertThat(questionnaireItem.choiceOrientation).isEqualTo(ChoiceOrientationTypes.HORIZONTAL)
+  }
+
+  @Test
+  fun choiceOrientation_missingExtension_shouldReturnNull() {
+    val questionnaireItem = Questionnaire.QuestionnaireItemComponent()
+    assertThat(questionnaireItem.choiceOrientation).isNull()
+  }
+
+  @Test
+  fun choiceOrientation_missingOrientation_shouldReturnNull() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_CHOICE_ORIENTATION_URL, CodeType(""))
+      }
+    assertThat(questionnaireItem.choiceOrientation).isNull()
+  }
+
+  @Test
+  fun mimeTypes_shouldReturnMimeTypes() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MIME_TYPE, CodeType("image/jpg"))
+        addExtension(EXTENSION_MIME_TYPE, CodeType("application/pdf"))
+      }
+    assertThat(questionnaireItem.mimeTypes).isEqualTo(listOf("image/jpg", "application/pdf"))
+  }
+
+  @Test
+  fun mimeTypes_missingMimeType_shouldReturnEmpty() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MIME_TYPE, CodeType(""))
+      }
+    assertThat(questionnaireItem.mimeTypes).isEmpty()
+  }
+
+  @Test
+  fun mimeTypes_missingExtension_shouldReturnNull() {
+    val questionnaireItem = Questionnaire.QuestionnaireItemComponent()
+    assertThat(questionnaireItem.mimeTypes).isEmpty()
+  }
+
+  @Test
+  fun `should return max size in bytes`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
+      }
+    assertThat(questionnaireItem.maxSizeInBytes).isEqualTo(BigDecimal(5242880))
+  }
+
+  @Test
+  fun `should return max size in kibibytes`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
+      }
+    assertThat(questionnaireItem.maxSizeInKiBs).isEqualTo(BigDecimal(5120))
+  }
+
+  @Test
+  fun `should return max size in mebibytes`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
+      }
+    assertThat(questionnaireItem.maxSizeInMiBs).isEqualTo(BigDecimal(5))
+  }
+
+  @Test
+  fun `should return null for max size in bytes`() {
+    assertThat(Questionnaire.QuestionnaireItemComponent().maxSizeInBytes).isNull()
+  }
+
+  @Test
+  fun `should return null for max size in kibibytes`() {
+    assertThat(Questionnaire.QuestionnaireItemComponent().maxSizeInKiBs).isNull()
+  }
+
+  @Test
+  fun `should return null for max size in mebibytes`() {
+    assertThat(Questionnaire.QuestionnaireItemComponent().maxSizeInMiBs).isNull()
+  }
+
+  @Test
+  fun `should return false if given size is below maximum size allowed`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
+      }
+    assertThat(questionnaireItem.isGivenSizeOverLimit(BigDecimal(10))).isFalse()
+  }
+
+  @Test
+  fun `should return true if given size is above maximum size allowed`() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
+      }
+    assertThat(questionnaireItem.isGivenSizeOverLimit(BigDecimal(52428809))).isTrue()
+  }
+
+  @Test
+  fun mimeType_size_shouldReturnNumberOfSupportedMimeTypes() {
+    assertThat(MimeType.values().size).isEqualTo(4)
+  }
+
+  @Test
+  fun hasMimeType_shouldReturnTrue() {
+    val questionnaire =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MIME_TYPE, CodeType("image/jpg"))
+        addExtension(EXTENSION_MIME_TYPE, CodeType("application/pdf"))
+      }
+    assertThat(questionnaire.hasMimeType(MimeType.IMAGE.value)).isTrue()
+  }
+
+  @Test
+  fun hasMimeType_shouldReturnFalse() {
+    val questionnaire =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MIME_TYPE, CodeType("image/jpg"))
+        addExtension(EXTENSION_MIME_TYPE, CodeType("application/pdf"))
+      }
+    assertThat(questionnaire.hasMimeType(MimeType.VIDEO.value)).isFalse()
+  }
+
+  @Test
+  fun hasMimeTypeOnly_shouldReturnTrue() {
+    val questionnaire =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MIME_TYPE, CodeType("image/jpg"))
+        addExtension(EXTENSION_MIME_TYPE, CodeType("image/png"))
+      }
+    assertThat(questionnaire.hasMimeTypeOnly(MimeType.IMAGE.value)).isTrue()
+  }
+
+  @Test
+  fun hasMimeTypeOnly_shouldReturnFalse() {
+    val questionnaire =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MIME_TYPE, CodeType("image/jpg"))
+        addExtension(EXTENSION_MIME_TYPE, CodeType("application/pdf"))
+      }
+    assertThat(questionnaire.hasMimeTypeOnly(MimeType.IMAGE.value)).isFalse()
+  }
+
+  @Test
+  fun maxSize_shouldReturnBytes() {
+    val questionnaire =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
+      }
+    assertThat(questionnaire.maxSizeInBytes).isEqualTo(BigDecimal(5242880))
+  }
+
+  @Test
+  fun maxSize_shouldReturnKibibytes() {
+    val questionnaire =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
+      }
+    assertThat(questionnaire.maxSizeInKiBs).isEqualTo(BigDecimal(5120))
+  }
+
+  @Test
+  fun maxSize_shouldReturnMebibytes() {
+    val questionnaire =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_MAX_SIZE, DecimalType(5242880))
+      }
+    assertThat(questionnaire.maxSizeInMiBs).isEqualTo(BigDecimal(5))
+  }
+
+  @Test
+  fun maxSizeInByte_missingExtension_shouldReturnNull() {
+    val questionnaire = Questionnaire.QuestionnaireItemComponent()
+    assertThat(questionnaire.maxSizeInBytes).isNull()
+  }
+
+  @Test
+  fun maxSizeInKiB_missingExtension_shouldReturnNull() {
+    val questionnaire = Questionnaire.QuestionnaireItemComponent()
+    assertThat(questionnaire.maxSizeInKiBs).isNull()
+  }
+
+  @Test
+  fun maxSizeInMiB_missingExtension_shouldReturnNull() {
+    val questionnaire = Questionnaire.QuestionnaireItemComponent()
+    assertThat(questionnaire.maxSizeInMiBs).isNull()
+  }
+
+  @Test
+  fun localizedTextSpanned_noText_shouldReturnNull() {
+    assertThat(Questionnaire.QuestionnaireItemComponent().localizedTextSpanned).isNull()
+  }
+
+  @Test
+  fun localizedTextSpanned_shouldReturnText() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        text = "Patient Information in <strong>strong</strong>"
+      }
+    Locale.setDefault(Locale.US)
+    assertThat(questionnaireItem.localizedTextSpanned.toString())
+      .isEqualTo("Patient Information in strong")
+  }
+
+  @Test
+  fun localizedTextSpanned_nonMatchingLocale_shouldReturnText() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        text = "Patient Information"
+        textElement.apply {
+          addExtension(
+            Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+              addExtension(Extension("lang", StringType("vi-VN")))
+              addExtension(Extension("content", StringType("Thông tin bệnh nhân")))
+            }
+          )
+        }
+      }
+    Locale.setDefault(Locale.US)
+
+    assertThat(questionnaireItem.localizedTextSpanned.toString()).isEqualTo("Patient Information")
+  }
+
+  @Test
+  fun localizedTextSpanned_matchingLocale_shouldReturnLocalizedText() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        text = "Patient Information"
+        textElement.apply {
+          addExtension(
+            Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+              addExtension(Extension("lang", StringType("vi-VN")))
+              addExtension(Extension("content", StringType("Thông tin bệnh nhân")))
+            }
+          )
+        }
+      }
+    Locale.setDefault(Locale.forLanguageTag("vi-VN"))
+
+    assertThat(questionnaireItem.localizedTextSpanned.toString()).isEqualTo("Thông tin bệnh nhân")
+  }
+
+  @Test
+  fun localizedTextSpanned_matchingLocaleWithoutCountryCode_shouldReturnLocalizedText() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        text = "Patient Information"
+        textElement.apply {
+          addExtension(
+            Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+              addExtension(Extension("lang", StringType("vi")))
+              addExtension(Extension("content", StringType("Thông tin bệnh nhân")))
+            }
+          )
+        }
+      }
+    Locale.setDefault(Locale.forLanguageTag("vi-VN"))
+
+    assertThat(questionnaireItem.localizedTextSpanned.toString()).isEqualTo("Thông tin bệnh nhân")
+  }
+
+  @Test
+  fun localizedPrefixSpanned_noPrefix_shouldReturnNull() {
+    val questionnaireItem = Questionnaire.QuestionnaireItemComponent()
+
+    assertThat(questionnaireItem.localizedPrefixSpanned).isNull()
+  }
+
+  @Test
+  fun localizedPrefixSpanned_shouldReturnPrefix() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply { prefix = "One in <strong>strong</strong>" }
+    Locale.setDefault(Locale.US)
+
+    assertThat(questionnaireItem.localizedPrefixSpanned.toString()).isEqualTo("One in strong")
+  }
+
+  @Test
+  fun localizedPrefixSpanned_nonMatchingLocale_shouldReturnText() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        prefix = "One"
+        prefixElement.apply {
+          addExtension(
+            Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+              addExtension(Extension("lang", StringType("vi-VN")))
+              addExtension(Extension("content", StringType("Một")))
+            }
+          )
+        }
+      }
+    Locale.setDefault(Locale.US)
+
+    assertThat(questionnaireItem.localizedPrefixSpanned.toString()).isEqualTo("One")
+  }
+
+  @Test
+  fun localizedPrefixSpanned_matchingLocale_shouldReturnLocalizedText() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        prefix = "One"
+        prefixElement.apply {
+          addExtension(
+            Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+              addExtension(Extension("lang", StringType("vi-VN")))
+              addExtension(Extension("content", StringType("Một")))
+            }
+          )
+        }
+      }
+    Locale.setDefault(Locale.forLanguageTag("vi-VN"))
+
+    assertThat(questionnaireItem.localizedPrefixSpanned.toString()).isEqualTo("Một")
+  }
+
+  @Test
+  fun localizedPrefixSpanned_matchingLocaleWithoutCountryCode_shouldReturnLocalizedText() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        prefix = "One"
+        prefixElement.apply {
+          addExtension(
+            Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+              addExtension(Extension("lang", StringType("vi")))
+              addExtension(Extension("content", StringType("Một")))
+            }
+          )
+        }
+      }
+    Locale.setDefault(Locale.forLanguageTag("vi-VN"))
+
+    assertThat(questionnaireItem.localizedPrefixSpanned.toString()).isEqualTo("Một")
+  }
+
+  @Test
+  fun `nested display item without instructions code returns null`() {
+    val questionItemList =
       listOf(
-	Coding().apply {
-	  code = "some random code"
-	  system = EXTENSION_DISPLAY_CATEGORY_SYSTEM
-	}
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "text"
+              }
+            )
+        }
       )
+
+    assertThat(questionItemList.first().localizedInstructionsSpanned).isNull()
   }
-)
-}
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "nested-display-question"
-text = "subtitle text"
-extension = listOf(displayCategoryExtension)
-type = Questionnaire.QuestionnaireItemType.STRING
-}
-assertThat(questionnaireItem.isInstructionsCode).isFalse()
-}
 
-@Test
-fun localizedFlyoverSpanned_noFlyover_shouldReturnNull() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-}
-)
-
-assertThat(questionItemList.first().localizedFlyoverSpanned).isNull()
-}
-
-@Test
-fun localizedFlyoverSpanned_shouldReturnFlyover() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
-      Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "flyover text"
-	type = Questionnaire.QuestionnaireItemType.DISPLAY
-	addExtension(
-	  EXTENSION_ITEM_CONTROL_URL,
-	  CodeableConcept().apply {
-	    addCoding().apply {
-	      system = EXTENSION_ITEM_CONTROL_SYSTEM
-	      code = "flyover"
-	    }
-	  }
-	)
-      }
-    )
-}
-)
-
-assertThat(questionItemList.first().localizedFlyoverSpanned.toString())
-.isEqualTo("flyover text")
-}
-
-@Test
-fun localizedFlyoverSpanned_nonMatchingLocale_shouldReturnFlyover() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
-      Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "flyover text"
-	textElement.apply {
-	  addExtension(
-	    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-	      addExtension(Extension("lang", StringType("vi-VN")))
-	      addExtension(Extension("content", StringType("gợi ý")))
-	    }
-	  )
-	}
-	type = Questionnaire.QuestionnaireItemType.DISPLAY
-	addExtension(
-	  EXTENSION_ITEM_CONTROL_URL,
-	  CodeableConcept().apply {
-	    addCoding().apply {
-	      system = EXTENSION_ITEM_CONTROL_SYSTEM
-	      code = "flyover"
-	    }
-	  }
-	)
-      }
-    )
-}
-)
-Locale.setDefault(Locale.US)
-
-assertThat(questionItemList.first().localizedFlyoverSpanned.toString())
-.isEqualTo("flyover text")
-}
-
-@Test
-fun `localizedHelpSpanned should return null if no help code`() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-}
-)
-
-assertThat(questionItemList.first().localizedHelpSpanned).isNull()
-}
-
-@Test
-fun `localizedHelpSpanned should return help`() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
-      Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "help text"
-	type = Questionnaire.QuestionnaireItemType.DISPLAY
-	addExtension(
-	  EXTENSION_ITEM_CONTROL_URL,
-	  CodeableConcept().apply {
-	    addCoding().apply {
-	      system = EXTENSION_ITEM_CONTROL_SYSTEM
-	      code = DisplayItemControlType.HELP.extensionCode
-	    }
-	  }
-	)
-      }
-    )
-}
-)
-
-assertThat(questionItemList.first().localizedHelpSpanned.toString()).isEqualTo("help text")
-}
-
-@Test
-fun `localizedHelpSpanned not matching locale should return help`() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
-      Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "help text"
-	textElement.apply {
-	  addExtension(
-	    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-	      addExtension(Extension("lang", StringType("vi-VN")))
-	      addExtension(Extension("content", StringType("gợi ý")))
-	    }
-	  )
-	}
-	type = Questionnaire.QuestionnaireItemType.DISPLAY
-	addExtension(
-	  EXTENSION_ITEM_CONTROL_URL,
-	  CodeableConcept().apply {
-	    addCoding().apply {
-	      system = EXTENSION_ITEM_CONTROL_SYSTEM
-	      code = DisplayItemControlType.HELP.extensionCode
-	    }
-	  }
-	)
-      }
-    )
-}
-)
-Locale.setDefault(Locale.US)
-
-assertThat(questionItemList.first().localizedHelpSpanned.toString()).isEqualTo("help text")
-}
-
-@Test
-fun `localizedHelpSpanned matching locale should return localized text`() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
-      Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "help text"
-	textElement.apply {
-	  addExtension(
-	    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-	      addExtension(Extension("lang", StringType("vi-VN")))
-	      addExtension(Extension("content", StringType("phụ đề")))
-	    }
-	  )
-	}
-	addExtension(
-	  EXTENSION_ITEM_CONTROL_URL,
-	  CodeableConcept().apply {
-	    addCoding().apply {
-	      system = EXTENSION_ITEM_CONTROL_SYSTEM
-	      code = DisplayItemControlType.HELP.extensionCode
-	    }
-	  }
-	)
-	type = Questionnaire.QuestionnaireItemType.DISPLAY
-      }
-    )
-}
-)
-Locale.setDefault(Locale.forLanguageTag("vi-VN"))
-
-assertThat(questionItemList.first().localizedHelpSpanned.toString()).isEqualTo("phụ đề")
-}
-
-@Test
-fun `isHidden should return true`() {
-assertThat(
-Questionnaire.QuestionnaireItemComponent()
-  .apply { addExtension(EXTENSION_HIDDEN_URL, BooleanType(true)) }
-  .isHidden
-)
-.isTrue()
-}
-
-@Test
-fun `isHidden should return false`() {
-assertThat(
-Questionnaire.QuestionnaireItemComponent()
-  .apply { addExtension(EXTENSION_HIDDEN_URL, BooleanType(false)) }
-  .isHidden
-)
-.isFalse()
-}
-
-@Test
-fun `isHidden should return false for invalid value`() {
-assertThat(
-Questionnaire.QuestionnaireItemComponent()
-  .apply { addExtension(EXTENSION_HIDDEN_URL, IntegerType(1)) }
-  .isHidden
-)
-.isFalse()
-}
-
-@Test
-fun enableWhenExpression_shouldReturnExpression() {
-val questionItem =
-Questionnaire()
-.addItem(
-  Questionnaire.QuestionnaireItemComponent().apply {
-    linkId = "first-name"
-    type = Questionnaire.QuestionnaireItemType.TEXT
-    extension =
+  @Test
+  fun `localizedInstructionsSpanned returns text`() {
+    val questionItemList =
       listOf(
-	Extension(
-	  EXTENSION_ENABLE_WHEN_EXPRESSION_URL,
-	  Expression().apply {
-	    language = "text/fhirpath"
-	    expression =
-	      "%resource.repeat(item).where(linkId='4.2.1').answer.value.code ='female'"
-	  }
-	)
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "subtitle text"
+                extension = listOf(displayCategoryExtensionWithInstructionsCode)
+                type = Questionnaire.QuestionnaireItemType.DISPLAY
+              }
+            )
+        }
       )
+    Locale.setDefault(Locale.US)
+
+    assertThat(questionItemList.first().localizedInstructionsSpanned.toString())
+      .isEqualTo("subtitle text")
   }
-)
 
-assertThat(questionItem.itemFirstRep.enableWhenExpression!!.expression)
-.isEqualTo("%resource.repeat(item).where(linkId='4.2.1').answer.value.code ='female'")
-}
-
-@Test
-fun enableWhenExpression_shouldReturnNull() {
-val questionItem =
-Questionnaire()
-.addItem(
-  Questionnaire.QuestionnaireItemComponent().apply {
-    linkId = "first-name"
-    type = Questionnaire.QuestionnaireItemType.TEXT
-    extension =
+  @Test
+  fun `localizedInstructionsSpanned returns text for non matching locale`() {
+    val questionItemList =
       listOf(
-	Extension(
-	  ITEM_INITIAL_EXPRESSION_URL,
-	  Expression().apply {
-	    language = "text/fhirpath"
-	    expression = "today()"
-	  }
-	)
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "subtitle text"
+                textElement.apply {
+                  addExtension(
+                    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+                      addExtension(Extension("lang", StringType("vi-VN")))
+                      addExtension(Extension("content", StringType("phụ đề")))
+                    }
+                  )
+                }
+                extension = listOf(displayCategoryExtensionWithInstructionsCode)
+                type = Questionnaire.QuestionnaireItemType.DISPLAY
+              }
+            )
+        }
       )
+    Locale.setDefault(Locale.US)
+
+    assertThat(questionItemList.first().localizedInstructionsSpanned.toString())
+      .isEqualTo("subtitle text")
   }
-)
 
-assertThat(questionItem.itemFirstRep.enableWhenExpression).isNull()
-}
+  @Test
+  fun `localizedInstructionsSpanned returns localized text for matching locale`() {
+    val questionItemList =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "subtitle text"
+                textElement.apply {
+                  addExtension(
+                    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+                      addExtension(Extension("lang", StringType("vi-VN")))
+                      addExtension(Extension("content", StringType("phụ đề")))
+                    }
+                  )
+                }
+                extension = listOf(displayCategoryExtensionWithInstructionsCode)
+                type = Questionnaire.QuestionnaireItemType.DISPLAY
+              }
+            )
+        }
+      )
+    Locale.setDefault(Locale.forLanguageTag("vi-VN"))
 
-@Test
-fun `calculatedExpression should return expression for valid extension url`() {
-val item =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(
-  EXTENSION_CALCULATED_EXPRESSION_URL,
-  Expression().apply {
-    this.expression = "today()"
-    this.language = "text/fhirpath"
+    assertThat(questionItemList.first().localizedInstructionsSpanned.toString()).isEqualTo("phụ đề")
   }
-)
-}
-assertThat(item.calculatedExpression).isNotNull()
-assertThat(item.calculatedExpression!!.expression).isEqualTo("today()")
-}
 
-@Test
-fun `calculatedExpression should return null for other extension url`() {
-val item =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(
-  ITEM_INITIAL_EXPRESSION_URL,
-  Expression().apply {
-    this.expression = "today()"
-    this.language = "text/fhirpath"
+  @Test
+  fun `localizedInstructionsSpanned returns localized text for matching locale without country code`() {
+    val questionItemList =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "subtitle text"
+                textElement.apply {
+                  addExtension(
+                    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+                      addExtension(Extension("lang", StringType("vi")))
+                      addExtension(Extension("content", StringType("phụ đề")))
+                    }
+                  )
+                }
+                extension = listOf(displayCategoryExtensionWithInstructionsCode)
+                type = Questionnaire.QuestionnaireItemType.DISPLAY
+              }
+            )
+        }
+      )
+    Locale.setDefault(Locale.forLanguageTag("vi-VN"))
+
+    assertThat(questionItemList.first().localizedInstructionsSpanned.toString()).isEqualTo("phụ đề")
   }
-)
-}
-assertThat(item.calculatedExpression).isNull()
-}
 
-@Test
-fun `expressionBasedExtensions should return all extension of type expression`() {
-val item =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_HIDDEN_URL, BooleanType(true))
-addExtension(
-  EXTENSION_CALCULATED_EXPRESSION_URL,
-  Expression().apply {
-    this.expression = "today()"
-    this.language = "text/fhirpath"
-  }
-)
-addExtension(
-  EXTENSION_ENABLE_WHEN_EXPRESSION_URL,
-  Expression().apply {
-    this.expression = "%resource.status == 'draft'"
-    this.language = "text/fhirpath"
-  }
-)
-}
-
-val result = item.expressionBasedExtensions
-
-assertThat(result.count()).isEqualTo(2)
-assertThat(result.first().url).isEqualTo(EXTENSION_CALCULATED_EXPRESSION_URL)
-assertThat(result.last().url).isEqualTo(EXTENSION_ENABLE_WHEN_EXPRESSION_URL)
-}
-
-@Test
-fun `isReferencedBy should return true`() {
-val item1 =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "A"
-addExtension(
-  EXTENSION_CALCULATED_EXPRESSION_URL,
-  Expression().apply {
-    this.expression = "%resource.item.where(linkId='B')"
-    this.language = "text/fhirpath"
-  }
-)
-}
-val item2 = Questionnaire.QuestionnaireItemComponent().apply { linkId = "B" }
-assertThat(item2.isReferencedBy(item1)).isTrue()
-}
-
-@Test
-fun `isReferencedBy should return false`() {
-val item1 =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "A"
-addExtension(
-  EXTENSION_CALCULATED_EXPRESSION_URL,
-  Expression().apply {
-    this.expression = "%resource.item.where(answer.value.empty())"
-    this.language = "text/fhirpath"
-  }
-)
-}
-val item2 = Questionnaire.QuestionnaireItemComponent().apply { linkId = "B" }
-assertThat(item2.isReferencedBy(item1)).isFalse()
-}
-
-@Test
-fun `flattened should return linear list`() {
-val items =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply { linkId = "A" },
-Questionnaire.QuestionnaireItemComponent()
-  .apply { linkId = "B" }
-  .addItem(
-    Questionnaire.QuestionnaireItemComponent()
-      .apply { linkId = "C" }
-      .addItem(Questionnaire.QuestionnaireItemComponent().apply { linkId = "D" })
-  )
-)
-assertThat(items.flattened().map { it.linkId }).containsExactly("A", "B", "C", "D")
-}
-
-@Test
-fun localizedFlyoverSpanned_matchingLocale_shouldReturnFlyover() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
+  @Test
+  fun `isInstructionsCode returns true`() {
+    val questionnaireItem =
       Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "flyover text"
-	textElement.apply {
-	  addExtension(
-	    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-	      addExtension(Extension("lang", StringType("vi-VN")))
-	      addExtension(Extension("content", StringType("gợi ý")))
-	    }
-	  )
-	}
-	type = Questionnaire.QuestionnaireItemType.DISPLAY
-	addExtension(
-	  EXTENSION_ITEM_CONTROL_URL,
-	  CodeableConcept().apply {
-	    addCoding().apply {
-	      system = EXTENSION_ITEM_CONTROL_SYSTEM
-	      code = "flyover"
-	    }
-	  }
-	)
+        linkId = "nested-display-question"
+        text = "subtitle text"
+        extension = listOf(displayCategoryExtensionWithInstructionsCode)
+        type = Questionnaire.QuestionnaireItemType.DISPLAY
       }
-    )
-}
-)
-Locale.setDefault(Locale.forLanguageTag("vi-VN"))
+    assertThat(questionnaireItem.isInstructionsCode).isTrue()
+  }
 
-assertThat(questionItemList.first().localizedFlyoverSpanned.toString()).isEqualTo("gợi ý")
-}
-
-@Test
-fun localizedFlyoverSpanned_matchingLocaleWithoutCountryCode_shouldReturnFlyover() {
-val questionItemList =
-listOf(
-Questionnaire.QuestionnaireItemComponent().apply {
-  linkId = "parent-question"
-  text = "parent question text"
-  type = Questionnaire.QuestionnaireItemType.BOOLEAN
-  item =
-    listOf(
+  @Test
+  fun `isInstructionsCode returns false if item type is not display`() {
+    val questionnaireItem =
       Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "nested-display-question"
-	text = "flyover text"
-	textElement.apply {
-	  addExtension(
-	    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
-	      addExtension(Extension("lang", StringType("vi")))
-	      addExtension(Extension("content", StringType("gợi ý")))
-	    }
-	  )
-	}
-	type = Questionnaire.QuestionnaireItemType.DISPLAY
-	addExtension(
-	  EXTENSION_ITEM_CONTROL_URL,
-	  CodeableConcept().apply {
-	    addCoding().apply {
-	      system = EXTENSION_ITEM_CONTROL_SYSTEM
-	      code = "flyover"
-	    }
-	  }
-	)
+        linkId = "nested-display-question"
+        text = "subtitle text"
+        extension = listOf(displayCategoryExtensionWithInstructionsCode)
+        type = Questionnaire.QuestionnaireItemType.STRING
       }
-    )
-}
-)
-Locale.setDefault(Locale.forLanguageTag("vi-VN"))
-
-assertThat(questionItemList.first().localizedFlyoverSpanned.toString()).isEqualTo("gợi ý")
-}
-
-@Test
-fun createQuestionResponseWithoutGroupAndNestedQuestions() {
-val question =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "gender"
-type = Questionnaire.QuestionnaireItemType.STRING
-initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(StringType("male")))
-}
-
-val questionResponse = question.createQuestionnaireResponseItem()
-
-assertThat((questionResponse.answer[0].value as StringType).value).isEqualTo("male")
-}
-
-@Test
-fun createQuestionResponseWithGroupQuestions() {
-val question =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "group-test"
-type = Questionnaire.QuestionnaireItemType.GROUP
-addItem(
-  Questionnaire.QuestionnaireItemComponent().apply {
-    linkId = "gender"
-    type = Questionnaire.QuestionnaireItemType.STRING
-    initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(StringType("male")))
+    assertThat(questionnaireItem.isInstructionsCode).isFalse()
   }
-)
 
-addItem(
-  Questionnaire.QuestionnaireItemComponent().apply {
-    linkId = "isActive"
-    type = Questionnaire.QuestionnaireItemType.BOOLEAN
-    initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(BooleanType(true)))
-  }
-)
-}
-
-val questionResponse = question.createQuestionnaireResponseItem()
-
-assertThat((questionResponse.item[0].answer[0].value as StringType).value).isEqualTo("male")
-assertThat((questionResponse.item[1].answer[0].value as BooleanType).booleanValue())
-.isEqualTo(true)
-}
-
-@Test
-fun createQuestionResponseWithNestedQuestions() {
-val question =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "group-test"
-type = Questionnaire.QuestionnaireItemType.GROUP
-addItem(
-  Questionnaire.QuestionnaireItemComponent().apply {
-    linkId = "gender"
-    type = Questionnaire.QuestionnaireItemType.STRING
-    initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(StringType("male")))
-
-    addItem(
+  @Test
+  fun `isInstructionsCode returns false if instructions code is not present`() {
+    val displayCategoryExtension =
+      Extension().apply {
+        url = EXTENSION_DISPLAY_CATEGORY_URL
+        setValue(
+          CodeableConcept().apply {
+            coding =
+              listOf(
+                Coding().apply {
+                  code = "some random code"
+                  system = EXTENSION_DISPLAY_CATEGORY_SYSTEM
+                }
+              )
+          }
+        )
+      }
+    val questionnaireItem =
       Questionnaire.QuestionnaireItemComponent().apply {
-	linkId = "isActive"
-	type = Questionnaire.QuestionnaireItemType.BOOLEAN
-	initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(BooleanType(true)))
+        linkId = "nested-display-question"
+        text = "subtitle text"
+        extension = listOf(displayCategoryExtension)
+        type = Questionnaire.QuestionnaireItemType.STRING
       }
-    )
+    assertThat(questionnaireItem.isInstructionsCode).isFalse()
   }
-)
-}
 
-val questionResponse = question.createQuestionnaireResponseItem()
+  @Test
+  fun localizedFlyoverSpanned_noFlyover_shouldReturnNull() {
+    val questionItemList =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+        }
+      )
 
-assertThat((questionResponse.item[0].answer[0].value as StringType).value).isEqualTo("male")
-assertThat(
-(questionResponse.item[0].answer[0].item[0].answer[0].value as BooleanType).booleanValue()
-)
-.isEqualTo(true)
-}
+    assertThat(questionItemList.first().localizedFlyoverSpanned).isNull()
+  }
 
-@Test
-fun `createQuestionResponse should not set answer for quantity type with missing value`() {
-val question =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "age"
-type = Questionnaire.QuestionnaireItemType.QUANTITY
-initial =
-  listOf(
-    Questionnaire.QuestionnaireItemInitialComponent(
-      Quantity().apply {
-	code = "months"
-	system = "http://unitofmeausre.org"
+  @Test
+  fun localizedFlyoverSpanned_shouldReturnFlyover() {
+    val questionItemList =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "flyover text"
+                type = Questionnaire.QuestionnaireItemType.DISPLAY
+                addExtension(
+                  EXTENSION_ITEM_CONTROL_URL,
+                  CodeableConcept().apply {
+                    addCoding().apply {
+                      system = EXTENSION_ITEM_CONTROL_SYSTEM
+                      code = "flyover"
+                    }
+                  }
+                )
+              }
+            )
+        }
+      )
+
+    assertThat(questionItemList.first().localizedFlyoverSpanned.toString())
+      .isEqualTo("flyover text")
+  }
+
+  @Test
+  fun localizedFlyoverSpanned_nonMatchingLocale_shouldReturnFlyover() {
+    val questionItemList =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "flyover text"
+                textElement.apply {
+                  addExtension(
+                    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+                      addExtension(Extension("lang", StringType("vi-VN")))
+                      addExtension(Extension("content", StringType("gợi ý")))
+                    }
+                  )
+                }
+                type = Questionnaire.QuestionnaireItemType.DISPLAY
+                addExtension(
+                  EXTENSION_ITEM_CONTROL_URL,
+                  CodeableConcept().apply {
+                    addCoding().apply {
+                      system = EXTENSION_ITEM_CONTROL_SYSTEM
+                      code = "flyover"
+                    }
+                  }
+                )
+              }
+            )
+        }
+      )
+    Locale.setDefault(Locale.US)
+
+    assertThat(questionItemList.first().localizedFlyoverSpanned.toString())
+      .isEqualTo("flyover text")
+  }
+
+  @Test
+  fun `localizedHelpSpanned should return null if no help code`() {
+    val questionItemList =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+        }
+      )
+
+    assertThat(questionItemList.first().localizedHelpSpanned).isNull()
+  }
+
+  @Test
+  fun `localizedHelpSpanned should return help`() {
+    val questionItemList =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "help text"
+                type = Questionnaire.QuestionnaireItemType.DISPLAY
+                addExtension(
+                  EXTENSION_ITEM_CONTROL_URL,
+                  CodeableConcept().apply {
+                    addCoding().apply {
+                      system = EXTENSION_ITEM_CONTROL_SYSTEM
+                      code = DisplayItemControlType.HELP.extensionCode
+                    }
+                  }
+                )
+              }
+            )
+        }
+      )
+
+    assertThat(questionItemList.first().localizedHelpSpanned.toString()).isEqualTo("help text")
+  }
+
+  @Test
+  fun `localizedHelpSpanned not matching locale should return help`() {
+    val questionItemList =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "help text"
+                textElement.apply {
+                  addExtension(
+                    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+                      addExtension(Extension("lang", StringType("vi-VN")))
+                      addExtension(Extension("content", StringType("gợi ý")))
+                    }
+                  )
+                }
+                type = Questionnaire.QuestionnaireItemType.DISPLAY
+                addExtension(
+                  EXTENSION_ITEM_CONTROL_URL,
+                  CodeableConcept().apply {
+                    addCoding().apply {
+                      system = EXTENSION_ITEM_CONTROL_SYSTEM
+                      code = DisplayItemControlType.HELP.extensionCode
+                    }
+                  }
+                )
+              }
+            )
+        }
+      )
+    Locale.setDefault(Locale.US)
+
+    assertThat(questionItemList.first().localizedHelpSpanned.toString()).isEqualTo("help text")
+  }
+
+  @Test
+  fun `localizedHelpSpanned matching locale should return localized text`() {
+    val questionItemList =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "help text"
+                textElement.apply {
+                  addExtension(
+                    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+                      addExtension(Extension("lang", StringType("vi-VN")))
+                      addExtension(Extension("content", StringType("phụ đề")))
+                    }
+                  )
+                }
+                addExtension(
+                  EXTENSION_ITEM_CONTROL_URL,
+                  CodeableConcept().apply {
+                    addCoding().apply {
+                      system = EXTENSION_ITEM_CONTROL_SYSTEM
+                      code = DisplayItemControlType.HELP.extensionCode
+                    }
+                  }
+                )
+                type = Questionnaire.QuestionnaireItemType.DISPLAY
+              }
+            )
+        }
+      )
+    Locale.setDefault(Locale.forLanguageTag("vi-VN"))
+
+    assertThat(questionItemList.first().localizedHelpSpanned.toString()).isEqualTo("phụ đề")
+  }
+
+  @Test
+  fun `isHidden should return true`() {
+    assertThat(
+        Questionnaire.QuestionnaireItemComponent()
+          .apply { addExtension(EXTENSION_HIDDEN_URL, BooleanType(true)) }
+          .isHidden
+      )
+      .isTrue()
+  }
+
+  @Test
+  fun `isHidden should return false`() {
+    assertThat(
+        Questionnaire.QuestionnaireItemComponent()
+          .apply { addExtension(EXTENSION_HIDDEN_URL, BooleanType(false)) }
+          .isHidden
+      )
+      .isFalse()
+  }
+
+  @Test
+  fun `isHidden should return false for invalid value`() {
+    assertThat(
+        Questionnaire.QuestionnaireItemComponent()
+          .apply { addExtension(EXTENSION_HIDDEN_URL, IntegerType(1)) }
+          .isHidden
+      )
+      .isFalse()
+  }
+
+  @Test
+  fun enableWhenExpression_shouldReturnExpression() {
+    val questionItem =
+      Questionnaire()
+        .addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "first-name"
+            type = Questionnaire.QuestionnaireItemType.TEXT
+            extension =
+              listOf(
+                Extension(
+                  EXTENSION_ENABLE_WHEN_EXPRESSION_URL,
+                  Expression().apply {
+                    language = "text/fhirpath"
+                    expression =
+                      "%resource.repeat(item).where(linkId='4.2.1').answer.value.code ='female'"
+                  }
+                )
+              )
+          }
+        )
+
+    assertThat(questionItem.itemFirstRep.enableWhenExpression!!.expression)
+      .isEqualTo("%resource.repeat(item).where(linkId='4.2.1').answer.value.code ='female'")
+  }
+
+  @Test
+  fun enableWhenExpression_shouldReturnNull() {
+    val questionItem =
+      Questionnaire()
+        .addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "first-name"
+            type = Questionnaire.QuestionnaireItemType.TEXT
+            extension =
+              listOf(
+                Extension(
+                  ITEM_INITIAL_EXPRESSION_URL,
+                  Expression().apply {
+                    language = "text/fhirpath"
+                    expression = "today()"
+                  }
+                )
+              )
+          }
+        )
+
+    assertThat(questionItem.itemFirstRep.enableWhenExpression).isNull()
+  }
+
+  @Test
+  fun `calculatedExpression should return expression for valid extension url`() {
+    val item =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(
+          EXTENSION_CALCULATED_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "today()"
+            this.language = "text/fhirpath"
+          }
+        )
       }
-    )
-  )
-}
+    assertThat(item.calculatedExpression).isNotNull()
+    assertThat(item.calculatedExpression!!.expression).isEqualTo("today()")
+  }
 
-val questionResponse = question.createQuestionnaireResponseItem()
-
-assertThat(questionResponse.answer).isEmpty()
-}
-
-@Test
-fun `createQuestionResponse should set answer with quantity type`() {
-val question =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "age"
-type = Questionnaire.QuestionnaireItemType.QUANTITY
-initial =
-  listOf(
-    Questionnaire.QuestionnaireItemInitialComponent(
-      Quantity().apply {
-	code = "months"
-	system = "http://unitofmeausre.org"
-	value = BigDecimal("1")
+  @Test
+  fun `calculatedExpression should return null for other extension url`() {
+    val item =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(
+          ITEM_INITIAL_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "today()"
+            this.language = "text/fhirpath"
+          }
+        )
       }
-    )
-  )
-}
+    assertThat(item.calculatedExpression).isNull()
+  }
 
-val questionResponse = question.createQuestionnaireResponseItem()
-val answer = questionResponse.answerFirstRep.value as Quantity
-assertThat(answer.value).isEqualTo(BigDecimal(1))
-assertThat(answer.code).isEqualTo("months")
-}
+  @Test
+  fun `expressionBasedExtensions should return all extension of type expression`() {
+    val item =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_HIDDEN_URL, BooleanType(true))
+        addExtension(
+          EXTENSION_CALCULATED_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "today()"
+            this.language = "text/fhirpath"
+          }
+        )
+        addExtension(
+          EXTENSION_ENABLE_WHEN_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "%resource.status == 'draft'"
+            this.language = "text/fhirpath"
+          }
+        )
+      }
 
-@Test
-fun entryFormat_missingFormat_shouldReturnNull() {
-val questionnaireItem =
-Questionnaire.QuestionnaireItemComponent().apply {
-addExtension(EXTENSION_ENTRY_FORMAT_URL, null)
-}
-assertThat(questionnaireItem.entryFormat).isNull()
-}
+    val result = item.expressionBasedExtensions
 
-@Test
-fun `createQuestionnaireResponseItem should set answer for non repeating question initial value`() {
-val question =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "phone"
-type = Questionnaire.QuestionnaireItemType.STRING
-initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(StringType("000011111")))
-}
+    assertThat(result.count()).isEqualTo(2)
+    assertThat(result.first().url).isEqualTo(EXTENSION_CALCULATED_EXPRESSION_URL)
+    assertThat(result.last().url).isEqualTo(EXTENSION_ENABLE_WHEN_EXPRESSION_URL)
+  }
 
-val responseItem = question.createQuestionnaireResponseItem()
+  @Test
+  fun `isReferencedBy should return true`() {
+    val item1 =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        linkId = "A"
+        addExtension(
+          EXTENSION_CALCULATED_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "%resource.item.where(linkId='B')"
+            this.language = "text/fhirpath"
+          }
+        )
+      }
+    val item2 = Questionnaire.QuestionnaireItemComponent().apply { linkId = "B" }
+    assertThat(item2.isReferencedBy(item1)).isTrue()
+  }
 
-assertThat(responseItem.answer.map { it.value.primitiveValue() }).containsExactly("000011111")
-}
+  @Test
+  fun `isReferencedBy should return false`() {
+    val item1 =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        linkId = "A"
+        addExtension(
+          EXTENSION_CALCULATED_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "%resource.item.where(answer.value.empty())"
+            this.language = "text/fhirpath"
+          }
+        )
+      }
+    val item2 = Questionnaire.QuestionnaireItemComponent().apply { linkId = "B" }
+    assertThat(item2.isReferencedBy(item1)).isFalse()
+  }
 
-@Test
-fun `createQuestionnaireResponseItem should set answer for repeating question initial values`() {
-val question =
-Questionnaire.QuestionnaireItemComponent().apply {
-linkId = "phones"
-type = Questionnaire.QuestionnaireItemType.STRING
-repeats = true
-initial =
-  listOf(
-    Questionnaire.QuestionnaireItemInitialComponent(StringType("000011111")),
-    Questionnaire.QuestionnaireItemInitialComponent(StringType("000022222"))
-  )
-}
+  @Test
+  fun `flattened should return linear list`() {
+    val items =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply { linkId = "A" },
+        Questionnaire.QuestionnaireItemComponent()
+          .apply { linkId = "B" }
+          .addItem(
+            Questionnaire.QuestionnaireItemComponent()
+              .apply { linkId = "C" }
+              .addItem(Questionnaire.QuestionnaireItemComponent().apply { linkId = "D" })
+          )
+      )
+    assertThat(items.flattened().map { it.linkId }).containsExactly("A", "B", "C", "D")
+  }
 
-val responseItem = question.createQuestionnaireResponseItem()
+  @Test
+  fun localizedFlyoverSpanned_matchingLocale_shouldReturnFlyover() {
+    val questionItemList =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "flyover text"
+                textElement.apply {
+                  addExtension(
+                    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+                      addExtension(Extension("lang", StringType("vi-VN")))
+                      addExtension(Extension("content", StringType("gợi ý")))
+                    }
+                  )
+                }
+                type = Questionnaire.QuestionnaireItemType.DISPLAY
+                addExtension(
+                  EXTENSION_ITEM_CONTROL_URL,
+                  CodeableConcept().apply {
+                    addCoding().apply {
+                      system = EXTENSION_ITEM_CONTROL_SYSTEM
+                      code = "flyover"
+                    }
+                  }
+                )
+              }
+            )
+        }
+      )
+    Locale.setDefault(Locale.forLanguageTag("vi-VN"))
 
-assertThat(responseItem.answer.map { it.value.primitiveValue() })
-.containsExactly("000011111", "000022222")
-}
+    assertThat(questionItemList.first().localizedFlyoverSpanned.toString()).isEqualTo("gợi ý")
+  }
 
-@Test
-  fun `createQuestionnaireResponseItem should set answer for non repeating question initialSelected option`() {
+  @Test
+  fun localizedFlyoverSpanned_matchingLocaleWithoutCountryCode_shouldReturnFlyover() {
+    val questionItemList =
+      listOf(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "parent-question"
+          text = "parent question text"
+          type = Questionnaire.QuestionnaireItemType.BOOLEAN
+          item =
+            listOf(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "nested-display-question"
+                text = "flyover text"
+                textElement.apply {
+                  addExtension(
+                    Extension(ToolingExtensions.EXT_TRANSLATION).apply {
+                      addExtension(Extension("lang", StringType("vi")))
+                      addExtension(Extension("content", StringType("gợi ý")))
+                    }
+                  )
+                }
+                type = Questionnaire.QuestionnaireItemType.DISPLAY
+                addExtension(
+                  EXTENSION_ITEM_CONTROL_URL,
+                  CodeableConcept().apply {
+                    addCoding().apply {
+                      system = EXTENSION_ITEM_CONTROL_SYSTEM
+                      code = "flyover"
+                    }
+                  }
+                )
+              }
+            )
+        }
+      )
+    Locale.setDefault(Locale.forLanguageTag("vi-VN"))
+
+    assertThat(questionItemList.first().localizedFlyoverSpanned.toString()).isEqualTo("gợi ý")
+  }
+
+  @Test
+  fun createQuestionResponseWithoutGroupAndNestedQuestions() {
+    val question =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        linkId = "gender"
+        type = Questionnaire.QuestionnaireItemType.STRING
+        initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(StringType("male")))
+      }
+
+    val questionResponse = question.createQuestionnaireResponseItem()
+
+    assertThat((questionResponse.answer[0].value as StringType).value).isEqualTo("male")
+  }
+
+  @Test
+  fun createQuestionResponseWithGroupQuestions() {
+    val question =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        linkId = "group-test"
+        type = Questionnaire.QuestionnaireItemType.GROUP
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "gender"
+            type = Questionnaire.QuestionnaireItemType.STRING
+            initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(StringType("male")))
+          }
+        )
+
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "isActive"
+            type = Questionnaire.QuestionnaireItemType.BOOLEAN
+            initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(BooleanType(true)))
+          }
+        )
+      }
+
+    val questionResponse = question.createQuestionnaireResponseItem()
+
+    assertThat((questionResponse.item[0].answer[0].value as StringType).value).isEqualTo("male")
+    assertThat((questionResponse.item[1].answer[0].value as BooleanType).booleanValue())
+      .isEqualTo(true)
+  }
+
+  @Test
+  fun createQuestionResponseWithNestedQuestions() {
+    val question =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        linkId = "group-test"
+        type = Questionnaire.QuestionnaireItemType.GROUP
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "gender"
+            type = Questionnaire.QuestionnaireItemType.STRING
+            initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(StringType("male")))
+
+            addItem(
+              Questionnaire.QuestionnaireItemComponent().apply {
+                linkId = "isActive"
+                type = Questionnaire.QuestionnaireItemType.BOOLEAN
+                initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(BooleanType(true)))
+              }
+            )
+          }
+        )
+      }
+
+    val questionResponse = question.createQuestionnaireResponseItem()
+
+    assertThat((questionResponse.item[0].answer[0].value as StringType).value).isEqualTo("male")
+    assertThat(
+        (questionResponse.item[0].answer[0].item[0].answer[0].value as BooleanType).booleanValue()
+      )
+      .isEqualTo(true)
+  }
+
+  @Test
+  fun `createQuestionResponse should not set answer for quantity type with missing value`() {
+    val question =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        linkId = "age"
+        type = Questionnaire.QuestionnaireItemType.QUANTITY
+        initial =
+          listOf(
+            Questionnaire.QuestionnaireItemInitialComponent(
+              Quantity().apply {
+                code = "months"
+                system = "http://unitofmeausre.org"
+              }
+            )
+          )
+      }
+
+    val questionResponse = question.createQuestionnaireResponseItem()
+
+    assertThat(questionResponse.answer).isEmpty()
+  }
+
+  @Test
+  fun `createQuestionResponse should set answer with quantity type`() {
+    val question =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        linkId = "age"
+        type = Questionnaire.QuestionnaireItemType.QUANTITY
+        initial =
+          listOf(
+            Questionnaire.QuestionnaireItemInitialComponent(
+              Quantity().apply {
+                code = "months"
+                system = "http://unitofmeausre.org"
+                value = BigDecimal("1")
+              }
+            )
+          )
+      }
+
+    val questionResponse = question.createQuestionnaireResponseItem()
+    val answer = questionResponse.answerFirstRep.value as Quantity
+    assertThat(answer.value).isEqualTo(BigDecimal(1))
+    assertThat(answer.code).isEqualTo("months")
+  }
+
+  @Test
+  fun entryFormat_missingFormat_shouldReturnNull() {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        addExtension(EXTENSION_ENTRY_FORMAT_URL, null)
+      }
+    assertThat(questionnaireItem.entryFormat).isNull()
+  }
+
+  @Test
+  fun `createQuestionnaireResponseItem should set answer for non repeating question initial value`() {
     val question =
       Questionnaire.QuestionnaireItemComponent().apply {
         linkId = "phone"
-        type = Questionnaire.QuestionnaireItemType.CHOICE
-        answerOption =
-          listOf(
-            Questionnaire.QuestionnaireItemAnswerOptionComponent().apply {
-              value = Coding("http://abc.com", "a", "A")
-            },
-            Questionnaire.QuestionnaireItemAnswerOptionComponent().apply {
-              initialSelected = true
-              value = Coding("http://abc.com", "b", "B")
-            },
-          )
+        type = Questionnaire.QuestionnaireItemType.STRING
+        initial = listOf(Questionnaire.QuestionnaireItemInitialComponent(StringType("000011111")))
       }
 
     val responseItem = question.createQuestionnaireResponseItem()
 
-    assertThat(responseItem.answer.map { it.valueCoding.code }).containsExactly("b")
+    assertThat(responseItem.answer.map { it.value.primitiveValue() }).containsExactly("000011111")
   }
 
   @Test
-  fun `createQuestionnaireResponseItem should set answer for repeating question initialSelected options`() {
+  fun `createQuestionnaireResponseItem should set answer for repeating question initial values`() {
     val question =
       Questionnaire.QuestionnaireItemComponent().apply {
         linkId = "phones"
-        type = Questionnaire.QuestionnaireItemType.CHOICE
+        type = Questionnaire.QuestionnaireItemType.STRING
         repeats = true
-        answerOption =
+        initial =
           listOf(
-            Questionnaire.QuestionnaireItemAnswerOptionComponent().apply {
-              initialSelected = true
-              value = Coding("http://abc.com", "a", "A")
-            },
-            Questionnaire.QuestionnaireItemAnswerOptionComponent().apply {
-              initialSelected = true
-              value = Coding("http://abc.com", "b", "B")
-            },
+            Questionnaire.QuestionnaireItemInitialComponent(StringType("000011111")),
+            Questionnaire.QuestionnaireItemInitialComponent(StringType("000022222"))
           )
       }
 
     val responseItem = question.createQuestionnaireResponseItem()
 
-    assertThat(responseItem.answer.map { it.valueCoding.code }).containsExactly("a", "b")
+    assertThat(responseItem.answer.map { it.value.primitiveValue() })
+      .containsExactly("000011111", "000022222")
   }
 
   @Test
->>>>>>> origin/option-init-selected
   fun `createQuestionnaireResponseItem should throw exception for non repeating question with multiple initial values `() {
     val question =
       Questionnaire.QuestionnaireItemComponent().apply {
@@ -1711,71 +1662,6 @@ assertThat(responseItem.answer.map { it.value.primitiveValue() })
   }
 
   @Test
-  fun `createQuestionnaireResponseItem should throw exception for non repeating question with multiple initialSelected options`() {
-    val question =
-      Questionnaire.QuestionnaireItemComponent().apply {
-        linkId = "phones"
-        type = Questionnaire.QuestionnaireItemType.CHOICE
-        answerOption =
-          listOf(
-            Questionnaire.QuestionnaireItemAnswerOptionComponent().apply {
-              initialSelected = true
-              value = Coding("http://abc.com", "a", "A")
-            },
-            Questionnaire.QuestionnaireItemAnswerOptionComponent().apply {
-              initialSelected = true
-              value = Coding("http://abc.com", "b", "B")
-            },
-          )
-      }
-    assertThrows(IllegalArgumentException::class.java) {
-        question.createQuestionnaireResponseItem()
-      }
-      .run {
-        assertThat(this.message)
-          .isEqualTo(
-            "Questionnaire item ${question.linkId} can only have multiple initial values for repeating items. See rule que-13 at https://www.hl7.org/fhir/questionnaire-definitions.html#Questionnaire.item.initial."
-          )
-      }
-  }
-
-  @Test
-  fun `createQuestionnaireResponseItem should throw exception for initial and answerOption both specified`() {
-    val question =
-      Questionnaire.QuestionnaireItemComponent().apply {
-        linkId = "phones"
-        type = Questionnaire.QuestionnaireItemType.CHOICE
-        initial =
-          listOf(
-            Questionnaire.QuestionnaireItemInitialComponent().apply {
-              value = Coding("http://abc.com", "a", "A")
-            }
-          )
-        answerOption =
-          listOf(
-            Questionnaire.QuestionnaireItemAnswerOptionComponent().apply {
-              initialSelected = true
-              value = Coding("http://abc.com", "a", "A")
-            },
-            Questionnaire.QuestionnaireItemAnswerOptionComponent().apply {
-              initialSelected = true
-              value = Coding("http://abc.com", "b", "B")
-            },
-          )
-      }
-    assertThrows(IllegalArgumentException::class.java) {
-        question.createQuestionnaireResponseItem()
-      }
-      .run {
-        assertThat(this.message)
-          .isEqualTo(
-            "Questionnaire item ${question.linkId} has both initial value(s) and has answerOption. See rule que-11 at https://www.hl7.org/fhir/questionnaire-definitions.html#Questionnaire.item.initial."
-          )
-      }
-  }
-
-  @Test
->>>>>>> origin/option-init-selected
   fun `fetchBitmapFromUrl() should return Bitmap from url`() {
     val attachment =
       Attachment().apply {

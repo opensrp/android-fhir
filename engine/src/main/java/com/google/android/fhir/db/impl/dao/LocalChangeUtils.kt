@@ -136,9 +136,11 @@ internal object LocalChangeUtils {
     with(JSONArray(jsonDiff.toString())) {
       val ignorePaths = setOf("/meta", "/text")
       return@with JSONArray(
-        (0 until length()).map { optJSONObject(it) }.filterNot { jsonObject ->
-          ignorePaths.any { jsonObject.optString("path").startsWith(it) }
-        }
+        (0 until length())
+          .map { optJSONObject(it) }
+          .filterNot { jsonObject ->
+            ignorePaths.any { jsonObject.optString("path").startsWith(it) }
+          }
       )
     }
 }
@@ -158,10 +160,7 @@ internal fun LocalChangeEntity.toLocalChange(): LocalChange {
 
 data class LocalChangeToken(val ids: List<Long>)
 
-data class SquashedLocalChange(
-  val token: LocalChangeToken,
-  val localChange: LocalChangeEntity
-)
+data class SquashedLocalChange(val token: LocalChangeToken, val localChange: LocalChangeEntity)
 
 /** Method to convert internal SquashedLocalChange to LocalChange instance. */
 internal fun SquashedLocalChange.toLocalChange(): LocalChange {

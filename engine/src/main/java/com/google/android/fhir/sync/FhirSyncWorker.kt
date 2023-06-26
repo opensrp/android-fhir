@@ -32,6 +32,7 @@ import com.google.android.fhir.sync.upload.TransactionBundleGenerator
 import com.google.gson.ExclusionStrategy
 import com.google.gson.FieldAttributes
 import com.google.gson.GsonBuilder
+import java.nio.charset.StandardCharsets
 import java.time.OffsetDateTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +44,6 @@ import org.apache.commons.io.IOUtils
 import org.hl7.fhir.r4.model.OperationOutcome
 import retrofit2.HttpException
 import timber.log.Timber
-import java.nio.charset.StandardCharsets
 
 /** A WorkManager Worker that handles periodic sync. */
 abstract class FhirSyncWorker(appContext: Context, workerParams: WorkerParameters) :
@@ -117,23 +117,22 @@ abstract class FhirSyncWorker(appContext: Context, workerParams: WorkerParameter
         CoroutineScope(Dispatchers.IO).launch {
           val jsonParser = FhirContext.forR4().newJsonParser()
 
-          (result).exceptions.filterIsInstance<HttpException>()
-            .forEach { resourceSyncHTTPException ->
-
-              val operationOutcome = jsonParser.parseResource(
+          (result).exceptions.filterIsInstance<HttpException>().forEach { resourceSyncHTTPException
+            ->
+            val operationOutcome =
+              jsonParser.parseResource(
                 IOUtils.toString(
-                  resourceSyncHTTPException.response()?.errorBody()
-                    ?.byteStream(),
+                  resourceSyncHTTPException.response()?.errorBody()?.byteStream(),
                   StandardCharsets.UTF_8
                 )
               ) as OperationOutcome
 
-              operationOutcome.issue.forEach { operationOutcome ->
-                Timber.e(
-                  "SERVER ${operationOutcome.severity} - HTTP ${resourceSyncHTTPException.code()} | Code - ${operationOutcome.code} | Diagnostics - ${operationOutcome.diagnostics}"
-                )
-              }
+            operationOutcome.issue.forEach { operationOutcome ->
+              Timber.e(
+                "SERVER ${operationOutcome.severity} - HTTP ${resourceSyncHTTPException.code()} | Code - ${operationOutcome.code} | Diagnostics - ${operationOutcome.diagnostics}"
+              )
             }
+          }
         }
       } catch (e: Exception) {
         Timber.e(e)
