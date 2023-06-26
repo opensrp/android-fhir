@@ -51,7 +51,7 @@ import androidx.room.PrimaryKey
  * ] For resource that is fully synced with server this table should not have any rows.
  */
 @Entity(indices = [Index(value = ["resourceType", "resourceId"])])
-internal data class LocalChangeEntity(
+data class LocalChangeEntity(
   @PrimaryKey(autoGenerate = true) val id: Long,
   val resourceType: String,
   val resourceId: String,

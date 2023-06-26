@@ -158,7 +158,7 @@ internal fun LocalChangeEntity.toLocalChange(): LocalChange {
 
 data class LocalChangeToken(val ids: List<Long>)
 
-internal data class SquashedLocalChange(
+data class SquashedLocalChange(
   val token: LocalChangeToken,
   val localChange: LocalChangeEntity
 )

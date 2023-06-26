@@ -22,6 +22,7 @@ import com.google.android.fhir.FhirEngine
 import com.google.android.fhir.LocalChange
 import com.google.android.fhir.db.Database
 import com.google.android.fhir.db.impl.dao.LocalChangeToken
+import com.google.android.fhir.db.impl.dao.SquashedLocalChange
 import com.google.android.fhir.db.impl.dao.toLocalChange
 import com.google.android.fhir.logicalId
 import com.google.android.fhir.search.Search
@@ -64,6 +65,9 @@ internal class FhirEngineImpl(private val database: Database, private val contex
   override suspend fun <R : Resource> search(search: Search): List<R> {
     return search.execute(database)
   }
+
+  override suspend fun getUnsyncedLocalChanges() : List<SquashedLocalChange> = database.getAllLocalChanges()
+
 /*
   suspend fun sample(dateFrom: Long, limit: Long) {
 

@@ -23,6 +23,7 @@ import ca.uhn.fhir.parser.IParser
 import com.google.android.fhir.FhirEngine
 import com.google.android.fhir.LocalChange
 import com.google.android.fhir.db.impl.dao.LocalChangeToken
+import com.google.android.fhir.db.impl.dao.SquashedLocalChange
 import com.google.android.fhir.search.Search
 import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.sync.BundleRequest
@@ -143,6 +144,10 @@ object TestFhirEngineImpl : FhirEngine {
   }
 
   override suspend fun <R : Resource> search(searchQuery: SearchQuery): List<R> {
+    TODO("Not yet implemented")
+  }
+
+  override suspend fun getUnsyncedLocalChanges(): List<SquashedLocalChange> {
     TODO("Not yet implemented")
   }
 

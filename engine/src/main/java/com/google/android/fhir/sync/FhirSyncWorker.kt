@@ -21,6 +21,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import ca.uhn.fhir.context.FhirContext
 import com.google.android.fhir.FhirEngine
 import com.google.android.fhir.FhirEngineProvider
 import com.google.android.fhir.OffsetDateTimeTypeAdapter
@@ -38,7 +39,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import org.apache.commons.io.IOUtils
+import org.hl7.fhir.r4.model.OperationOutcome
+import retrofit2.HttpException
 import timber.log.Timber
+import java.nio.charset.StandardCharsets
 
 /** A WorkManager Worker that handles periodic sync. */
 abstract class FhirSyncWorker(appContext: Context, workerParams: WorkerParameters) :
@@ -105,6 +110,35 @@ abstract class FhirSyncWorker(appContext: Context, workerParams: WorkerParameter
         }
         .synchronize()
     val output = buildWorkData(result)
+
+    if (result is SyncJobStatus.Failed) {
+
+      try {
+        CoroutineScope(Dispatchers.IO).launch {
+          val jsonParser = FhirContext.forR4().newJsonParser()
+
+          (result).exceptions.filterIsInstance<HttpException>()
+            .forEach { resourceSyncHTTPException ->
+
+              val operationOutcome = jsonParser.parseResource(
+                IOUtils.toString(
+                  resourceSyncHTTPException.response()?.errorBody()
+                    ?.byteStream(),
+                  StandardCharsets.UTF_8
+                )
+              ) as OperationOutcome
+
+              operationOutcome.issue.forEach { operationOutcome ->
+                Timber.e(
+                  "SERVER ${operationOutcome.severity} - HTTP ${resourceSyncHTTPException.code()} | Code - ${operationOutcome.code} | Diagnostics - ${operationOutcome.diagnostics}"
+                )
+              }
+            }
+        }
+      } catch (e: Exception) {
+        Timber.e(e)
+      }
+    }
 
     // await/join is needed to collect states completely
     kotlin.runCatching { job.join() }.onFailure(Timber::w)
