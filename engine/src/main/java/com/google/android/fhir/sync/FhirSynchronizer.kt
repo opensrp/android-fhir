@@ -118,7 +118,6 @@ internal class FhirSynchronizer(
       .catch { exceptions.add(ResourceSyncException(ResourceType.Bundle, Exception(it))) }
       .collect()
     return if (exceptions.isEmpty()) {
-      setSyncState(SyncJobStatus.Finished())
       SyncResult.Success()
     } else {
       setSyncState(SyncJobStatus.Glitch(exceptions))
