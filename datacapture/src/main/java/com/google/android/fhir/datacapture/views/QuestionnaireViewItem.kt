@@ -31,6 +31,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.QuestionnaireResponse
+import org.hl7.fhir.r4.model.QuestionnaireResponse.QuestionnaireResponseItemComponent
+import org.hl7.fhir.r4.model.StringType
 
 /**
  * Data item for [QuestionnaireItemViewHolder] in [RecyclerView].
@@ -70,22 +72,28 @@ data class QuestionnaireViewItem(
   val validationResult: ValidationResult,
   internal val answersChangedCallback:
     (
-      Questionnaire.QuestionnaireItemComponent,
-      QuestionnaireResponse.QuestionnaireResponseItemComponent,
-      List<QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent>,
-      Any?
-    ) -> Unit,
+    Questionnaire.QuestionnaireItemComponent,
+    QuestionnaireResponse.QuestionnaireResponseItemComponent,
+    List<QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent>,
+    Any?
+  ) -> Unit,
   private val resolveAnswerValueSet:
-    suspend (String) -> List<Questionnaire.QuestionnaireItemAnswerOptionComponent> =
+  suspend (String) -> List<Questionnaire.QuestionnaireItemAnswerOptionComponent> =
     {
       emptyList()
     },
   private val resolveAnswerExpression:
-    suspend (Questionnaire.QuestionnaireItemComponent) -> List<
-        Questionnaire.QuestionnaireItemAnswerOptionComponent> =
+  suspend (Questionnaire.QuestionnaireItemComponent) -> List<
+          Questionnaire.QuestionnaireItemAnswerOptionComponent> =
     {
       emptyList()
     },
+  private val resolveDynamicText:
+  suspend (
+    Questionnaire.QuestionnaireItemComponent,
+    QuestionnaireResponseItemComponent,
+    StringType
+  ) -> String?,
   val draftAnswer: Any? = null,
   val enabledDisplayItems: List<Questionnaire.QuestionnaireItemComponent> = emptyList(),
   val questionViewTextConfiguration: QuestionTextConfiguration = QuestionTextConfiguration(),
@@ -109,7 +117,7 @@ data class QuestionnaireViewItem(
   /** Updates the answers. This will override any existing answers and removes the draft answer. */
   fun setAnswer(
     vararg questionnaireResponseItemAnswerComponent:
-      QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent
+    QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent
   ) {
     check(questionnaireItem.repeats || questionnaireResponseItemAnswerComponent.size <= 1) {
       "Questionnaire item with linkId ${questionnaireItem.linkId} has repeated answers."
@@ -130,7 +138,7 @@ data class QuestionnaireViewItem(
   /** Adds an answer to the existing answers and removes the draft answer. */
   fun addAnswer(
     questionnaireResponseItemAnswerComponent:
-      QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent
+    QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent
   ) {
     check(questionnaireItem.repeats) {
       "Questionnaire item with linkId ${questionnaireItem.linkId} does not allow repeated answers"
@@ -146,7 +154,7 @@ data class QuestionnaireViewItem(
   /** Removes an answer from the existing answers, as well as any draft answer. */
   fun removeAnswer(
     questionnaireResponseItemAnswerComponent:
-      QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent
+    QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent
   ) {
     check(questionnaireItem.repeats) {
       "Questionnaire item with linkId ${questionnaireItem.linkId} does not allow repeated answers"
@@ -216,7 +224,15 @@ data class QuestionnaireViewItem(
    * is derived from [localizedTextSpanned] of [QuestionnaireResponse.QuestionnaireItemComponent]
    */
   val questionText: Spanned? by lazy {
-    questionnaireResponseItem.text?.toSpanned() ?: questionnaireItem.localizedTextSpanned
+    runBlocking(Dispatchers.IO) {
+      questionnaireResponseItem.text =
+        resolveDynamicText(
+          questionnaireItem,
+          questionnaireResponseItem,
+          questionnaireItem.textElement
+        )
+      questionnaireResponseItem.text?.toSpanned() ?: questionnaireItem.localizedTextSpanned
+    }
   }
 
   /**
@@ -230,7 +246,7 @@ data class QuestionnaireViewItem(
    */
   internal fun hasTheSameItem(other: QuestionnaireViewItem) =
     questionnaireItem === other.questionnaireItem &&
-      questionnaireResponseItem === other.questionnaireResponseItem
+            questionnaireResponseItem === other.questionnaireResponseItem
 
   /**
    * Returns whether this [QuestionnaireViewItem] and the `other` [QuestionnaireViewItem] have the
@@ -241,15 +257,15 @@ data class QuestionnaireViewItem(
    */
   internal fun hasTheSameResponse(other: QuestionnaireViewItem) =
     answers.size == other.answers.size &&
-      answers
-        .zip(other.answers) { answer, otherAnswer ->
-          answer.value != null &&
-            otherAnswer.value != null &&
-            answer.value.equalsShallow(otherAnswer.value)
-        }
-        .all { it } &&
-      draftAnswer == other.draftAnswer &&
-      questionText == other.questionText
+            answers
+              .zip(other.answers) { answer, otherAnswer ->
+                answer.value != null &&
+                        otherAnswer.value != null &&
+                        answer.value.equalsShallow(otherAnswer.value)
+              }
+              .all { it } &&
+            draftAnswer == other.draftAnswer &&
+            questionText == other.questionText
 
   /**
    * Returns whether this [QuestionnaireViewItem] and the `other` [QuestionnaireViewItem] have the

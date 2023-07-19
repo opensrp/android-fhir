@@ -764,6 +764,9 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
             answersChangedCallback = answersChangedCallback,
             resolveAnswerValueSet = { resolveAnswerValueSet(it) },
             resolveAnswerExpression = { resolveAnswerExpression(it) },
+            resolveDynamicText = { item, responseItem, textElement ->
+              resolveDynamicText(item, responseItem, textElement)
+            },
             draftAnswer = draftAnswerMap[questionnaireResponseItem],
             enabledDisplayItems =
             questionnaireItem.item.filter {
