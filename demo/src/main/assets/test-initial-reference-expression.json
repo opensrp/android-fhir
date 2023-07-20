@@ -1,0 +1,60 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "test-questionnaire",
+  "language": "en",
+  "title": "Test Questionnaire",
+  "status": "active",
+  "publisher": "mcore",
+  "contact": [
+    {
+      "name": "http://www.d-tree.org"
+    }
+  ],
+  "item": [
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+          "valueCodeableConcept": {
+            "coding": [
+              {
+                "system": "http://hl7.org/fhir/questionnaire-item-control",
+                "code": "drop-down",
+                "display": "Drop down"
+              }
+            ],
+            "text": "Drop down"
+          }
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-answerExpression",
+          "valueExpression": {
+            "expression": "Patient?address-city=NAIROBI",
+            "language": "application/x-fhir-query"
+          }
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-choiceColumn",
+          "extension": [
+            {
+              "url": "path",
+              "valueString": "name.given"
+            },
+            {
+              "url": "label",
+              "valueString": "text"
+            },
+            {
+              "url": "forDisplay",
+              "valueBoolean": true
+            }
+          ]
+        }
+      ],
+      "linkId": "district",
+      "text": "District",
+      "type": "reference",
+      "required": true
+    }
+  ]
+}

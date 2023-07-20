@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,11 +45,12 @@ class EditPatientViewModel(application: Application, private val state: SavedSta
 
   private suspend fun prepareEditPatient(): Pair<String, String> {
     val patient = fhirEngine.get<Patient>(patientId)
-    val question = readFileFromAssets("new-patient-registration-paginated.json").trimIndent()
+    //    val question = readFileFromAssets("new-patient-registration-paginated.json").trimIndent()
+    val question = readFileFromAssets("test-initial-reference-expression.json").trimIndent()
     val parser = FhirContext.forCached(FhirVersionEnum.R4).newJsonParser()
     val questionnaire =
-      parser.parseResource(org.hl7.fhir.r4.model.Questionnaire::class.java, question) as
-        Questionnaire
+      parser.parseResource(org.hl7.fhir.r4.model.Questionnaire::class.java, question)
+        as Questionnaire
 
     val questionnaireResponse: QuestionnaireResponse =
       ResourceMapper.populate(questionnaire, patient)
@@ -63,8 +64,8 @@ class EditPatientViewModel(application: Application, private val state: SavedSta
 
   private val questionnaireResource: Questionnaire
     get() =
-      FhirContext.forCached(FhirVersionEnum.R4).newJsonParser().parseResource(questionnaire) as
-        Questionnaire
+      FhirContext.forCached(FhirVersionEnum.R4).newJsonParser().parseResource(questionnaire)
+        as Questionnaire
 
   private var questionnaireJson: String? = null
 

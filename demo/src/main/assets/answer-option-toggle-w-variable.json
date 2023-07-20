@@ -1,0 +1,383 @@
+{
+  "resourceType": "Questionnaire",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/variable",
+      "valueExpression": {
+        "name": "gad-7-answer",
+        "language": "text/fhirpath",
+        "expression": "%resource.descendants().where(linkId='f1.1.2').answer.value"
+      }
+    }
+  ],
+  "item": [
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+          "valueCodeableConcept": {
+            "coding": [
+              {
+                "system": "http://hl7.org/fhir/questionnaire-item-control",
+                "code": "page",
+                "display": "Page"
+              }
+            ],
+            "text": "Page"
+          }
+        }
+      ],
+      "linkId": "f1.1",
+      "type": "group",
+      "item": [
+        {
+          "linkId": "f1.1.1",
+          "text": "<span style=\"color:#006EB8\"><i><b>Choose an assessment to start with</b></i></span>",
+          "_text": {
+            "extension": [
+              {
+                "url": "http://hl7.org/fhir/StructureDefinition/translation",
+                "extension": [
+                  {
+                    "url": "lang",
+                    "valueCode": "es"
+                  },
+                  {
+                    "url": "content",
+                    "valueString": "<span style=\"color:#006EB8\"><b><i>Elija una evaluación para comenzar</b></i></span>"
+                  }
+                ]
+              },
+              {
+                "url": "http://hl7.org/fhir/StructureDefinition/translation",
+                "extension": [
+                  {
+                    "url": "lang",
+                    "valueCode": "en"
+                  },
+                  {
+                    "url": "content",
+                    "valueString": "<span style=\"color:#006EB8\"><i><b>Choose an assessment to start with</b></i></span>"
+                  }
+                ]
+              }
+            ]
+          },
+          "type": "group",
+          "item": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-displayCategory",
+                  "valueCodeableConcept": {
+                    "coding": [
+                      {
+                        "system": "http://hl7.org/fhir/questionnaire-display-category",
+                        "code": "instructions"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "linkId": "f1.1.1.1",
+              "text": "<span style=\"color:#006EB8\"><i>Example dialogue</i></span>",
+              "type": "display"
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                  "valueCodeableConcept": {
+                    "coding": [
+                      {
+                        "system": "http://hl7.org/fhir/questionnaire-item-control",
+                        "code": "help"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "linkId": "f1.1.1.2",
+              "text": "Dialogue #1: <br><i>\"Now I am going to ask you some questions to see how you have been feeling.\"</i><br><br>Dialogue #2: <br><i>\"As you remember, you answered some questions, which showed us you have distress. Now, I am going to ask you some more questions to better understand your distress and what might have contributed to it. Everything you say will be kept private between the two of us, unless you want me to tell someone else or you are in danger. We should be able to help you feel better. Together, we will try to understand the problems that are contributing to your distress and look for ways to manage it so that you feel better.\"</i>",
+              "type": "display"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://hl7.org/fhir/questionnaire-item-control",
+                    "code": "radio-button",
+                    "display": "Radio Button"
+                  }
+                ]
+              }
+            }
+          ],
+          "linkId": "f1.1.2",
+          "text": "<span style=\"color:#006EB8\"><i>Please note that in IPC Session 1, you should complete all 4 assessments listed here:</i></span>",
+          "_text": {
+            "extension": [
+              {
+                "url": "http://hl7.org/fhir/StructureDefinition/translation",
+                "extension": [
+                  {
+                    "url": "lang",
+                    "valueCode": "es"
+                  },
+                  {
+                    "url": "content",
+                    "valueString": "<span style=\"color:#006EB8\"><i>Tenga en cuenta que en la Sesión 1 de IPC, debe completar las 4 evaluaciones enumeradas aquí:</i></span>"
+                  }
+                ]
+              },
+              {
+                "url": "http://hl7.org/fhir/StructureDefinition/translation",
+                "extension": [
+                  {
+                    "url": "lang",
+                    "valueCode": "en"
+                  },
+                  {
+                    "url": "content",
+                    "valueString": "<span style=\"color:#006EB8\"><i>Please note that in IPC Session 1, you should complete all 4 assessments listed here:</i></span>"
+                  }
+                ]
+              }
+            ]
+          },
+          "type": "choice",
+          "answerOption": [
+            {
+              "valueCoding": {
+                "code": "phq-9",
+                "display": "PHQ-9"
+              }
+            },
+            {
+              "valueCoding": {
+                "code": "gad-7",
+                "display": "GAD-7"
+              }
+            },
+            {
+              "valueCoding": {
+                "code": "pc-ptsd-screen",
+                "display": "PC-PTSD Screen"
+              }
+            },
+            {
+              "valueCoding": {
+                "code": "mood-rating-scale",
+                "display": "Mood Rating Scale"
+              }
+            },
+            {
+              "valueCoding": {
+                "code": "start-ipc",
+                "display": "Start IPC"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+          "valueCodeableConcept": {
+            "coding": [
+              {
+                "system": "http://hl7.org/fhir/questionnaire-item-control",
+                "code": "page",
+                "display": "Page"
+              }
+            ],
+            "text": "Page"
+          }
+        }
+      ],
+      "linkId": "f1.2",
+      "type": "group",
+      "item": [
+        {
+          "linkId": "f1.2.1",
+          "text": "<span style=\"color:#006EB8\"><i><b>Choose an assessment to start with</b></i></span>",
+          "_text": {
+            "extension": [
+              {
+                "url": "http://hl7.org/fhir/StructureDefinition/translation",
+                "extension": [
+                  {
+                    "url": "lang",
+                    "valueCode": "es"
+                  },
+                  {
+                    "url": "content",
+                    "valueString": "<span style=\"color:#006EB8\"><b><i>Elija una evaluación para comenzar</b></i></span>"
+                  }
+                ]
+              },
+              {
+                "url": "http://hl7.org/fhir/StructureDefinition/translation",
+                "extension": [
+                  {
+                    "url": "lang",
+                    "valueCode": "en"
+                  },
+                  {
+                    "url": "content",
+                    "valueString": "<span style=\"color:#006EB8\"><i><b>Choose an assessment to start with</b></i></span>"
+                  }
+                ]
+              }
+            ]
+          },
+          "type": "group",
+          "item": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-displayCategory",
+                  "valueCodeableConcept": {
+                    "coding": [
+                      {
+                        "system": "http://hl7.org/fhir/questionnaire-display-category",
+                        "code": "instructions"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "linkId": "f1.2.1.1",
+              "text": "<span style=\"color:#006EB8\"><i>Example dialogue</i></span>",
+              "type": "display"
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                  "valueCodeableConcept": {
+                    "coding": [
+                      {
+                        "system": "http://hl7.org/fhir/questionnaire-item-control",
+                        "code": "help"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "linkId": "f1.2.1.2",
+              "text": "Dialogue #1: <br><i>\"Now I am going to ask you some questions to see how you have been feeling.\"</i><br><br>Dialogue #2: <br><i>\"As you remember, you answered some questions, which showed us you have distress. Now, I am going to ask you some more questions to better understand your distress and what might have contributed to it. Everything you say will be kept private between the two of us, unless you want me to tell someone else or you are in danger. We should be able to help you feel better. Together, we will try to understand the problems that are contributing to your distress and look for ways to manage it so that you feel better.\"</i>",
+              "type": "display"
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+              "valueCodeableConcept": {
+                "coding": [
+                  {
+                    "system": "http://hl7.org/fhir/questionnaire-item-control",
+                    "code": "radio-button",
+                    "display": "Radio Button"
+                  }
+                ]
+              }
+            },
+            {
+              "extension": [
+                {
+                  "url": "option",
+                  "valueCoding": {
+                    "code": "gad-7"
+                  }
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%gad-7-answer.exists().not()"
+                  }
+                }
+              ],
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-answerOptionsToggleExpression"
+            }
+          ],
+          "linkId": "f1.2.2",
+          "text": "<span style=\"color:#006EB8\"><i>Please note that in IPC Session 1, you should complete all 4 assessments listed here:</i></span>",
+          "_text": {
+            "extension": [
+              {
+                "url": "http://hl7.org/fhir/StructureDefinition/translation",
+                "extension": [
+                  {
+                    "url": "lang",
+                    "valueCode": "es"
+                  },
+                  {
+                    "url": "content",
+                    "valueString": "<span style=\"color:#006EB8\"><i>Tenga en cuenta que en la Sesión 1 de IPC, debe completar las 4 evaluaciones enumeradas aquí:</i></span>"
+                  }
+                ]
+              },
+              {
+                "url": "http://hl7.org/fhir/StructureDefinition/translation",
+                "extension": [
+                  {
+                    "url": "lang",
+                    "valueCode": "en"
+                  },
+                  {
+                    "url": "content",
+                    "valueString": "<span style=\"color:#006EB8\"><i>Please note that in IPC Session 1, you should complete all 4 assessments listed here:</i></span>"
+                  }
+                ]
+              }
+            ]
+          },
+          "type": "choice",
+          "answerOption": [
+            {
+              "valueCoding": {
+                "code": "phq-9",
+                "display": "PHQ-9"
+              }
+            },
+            {
+              "valueCoding": {
+                "code": "gad-7",
+                "display": "GAD-7"
+              }
+            },
+            {
+              "valueCoding": {
+                "code": "pc-ptsd-screen",
+                "display": "PC-PTSD Screen"
+              }
+            },
+            {
+              "valueCoding": {
+                "code": "mood-rating-scale",
+                "display": "Mood Rating Scale"
+              }
+            },
+            {
+              "valueCoding": {
+                "code": "start-ipc",
+                "display": "Start IPC"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

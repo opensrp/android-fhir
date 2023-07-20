@@ -1,0 +1,4 @@
+- Fix failing tests
+    - Check if a sentinel QuestionnaireState is needed
+    - How to get questionnaireViewItems when initial questionnaireStateFlow value is not generated
+      from questionnaire

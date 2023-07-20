@@ -42,7 +42,8 @@ class EditPatientFragment : Fragment(R.layout.add_patient_fragment) {
       title = requireContext().getString(R.string.edit_patient)
     }
     requireArguments()
-      .putString(QUESTIONNAIRE_FILE_PATH_KEY, "new-patient-registration-paginated.json")
+      //      .putString(QUESTIONNAIRE_FILE_PATH_KEY, "new-patient-registration-paginated.json")
+      .putString(QUESTIONNAIRE_FILE_PATH_KEY, "test-initial-reference-expression.json")
 
     viewModel.livePatientData.observe(viewLifecycleOwner) { addQuestionnaireFragment(it) }
     viewModel.isPatientSaved.observe(viewLifecycleOwner) {

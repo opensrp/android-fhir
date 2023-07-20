@@ -1,0 +1,105 @@
+{
+  "resourceType": "Questionnaire",
+  "status": "draft",
+  "item": [
+    {
+      "linkId": "a-age-years",
+      "text": "Age years",
+      "type": "quantity",
+      "initial": [{
+        "valueQuantity": {
+          "unit": "years",
+          "system": "http://unitsofmeasure.org",
+          "code": "years"
+        }
+      }]
+    },
+    {
+      "extension": [
+        {
+          "extension": [
+            {
+              "url": "option",
+              "valueCoding": {
+                "code": "babies-need-only-breastmilk",
+                "display": "Babies need ONLY breastmilk for nutrition for the first 6 months of life. No water and no food should be given. ONLY give breastmilk and the baby's medicine"
+              }
+            },
+            {
+              "url": "option",
+              "valueCoding": {
+                "code": "if-any-breast-swelling",
+                "display": "If any breast swelling or redness or cracking or breeding for nipples come to clinic immediately and stop feeding from that breast that day. You can express and throw that milk away and be seen at clinic immediately. Allow baby to breastfeed on the other side only"
+              }
+            },
+            {
+              "url": "option",
+              "valueCoding": {
+                "code": "breastfeed-often",
+                "display": "Breastfeed often to avoid engorgement"
+              }
+            },
+            {
+              "url": "expression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%resource.repeat(item).where(linkId='a-age-years' and answer.empty().not()).select(answer.value) < 2 'years'.toQuantity()"
+              }
+            }
+          ],
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-answerOptionsToggleExpression"
+        },
+        {
+          "extension": [
+            {
+              "url": "option",
+              "valueCoding": {
+                "code": "call-doctor",
+                "display": "Call the doctor for daily appointment"
+              }
+            },
+            {
+              "url": "expression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%resource.repeat(item).where(linkId='a-age-years' and answer.empty().not()).select(answer.value) > 2 'years'.toQuantity()"
+              }
+            }
+          ],
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-answerOptionsToggleExpression"
+        }
+      ],
+      "linkId": "feeding-counselling-option",
+      "text": "<b>Tell:</b> the parent the following and <b>Select</b> what you told them",
+      "type": "choice",
+      "required": true,
+      "repeats": true,
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "babies-need-only-breastmilk",
+            "display": "Babies need ONLY breastmilk for nutrition for the first 6 months of life. No water and no food should be given. ONLY give breastmilk and the baby's medicine"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "if-any-breast-swelling",
+            "display": "If any breast swelling or redness or cracking or breeding for nipples come to clinic immediately and stop feeding from that breast that day. You can express and throw that milk away and be seen at clinic immediately. Allow baby to breastfeed on the other side only"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "breastfeed-often",
+            "display": "Breastfeed often to avoid engorgement"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "call-doctor",
+            "display": "Call the doctor for daily appointment"
+          }
+        }
+      ]
+    }
+  ]
+}
