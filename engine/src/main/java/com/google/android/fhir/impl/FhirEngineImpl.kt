@@ -49,7 +49,7 @@ internal class FhirEngineImpl(private val database: Database, private val contex
   override suspend fun create(vararg resource: Resource): List<String> {
     return database.insert(*resource)
   }
-  override suspend fun createRemote(vararg resource: Resource){
+  override suspend fun createRemote(vararg resource: Resource) {
     return database.insertRemote(*resource)
   }
 

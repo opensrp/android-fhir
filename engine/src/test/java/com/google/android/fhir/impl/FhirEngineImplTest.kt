@@ -41,10 +41,9 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.hl7.fhir.exceptions.FHIRException
 import org.hl7.fhir.r4.model.Address
-
+import org.hl7.fhir.r4.model.CanonicalType
 import org.hl7.fhir.r4.model.Coding
 import org.hl7.fhir.r4.model.Encounter
-import org.hl7.fhir.r4.model.CanonicalType
 import org.hl7.fhir.r4.model.Enumerations
 import org.hl7.fhir.r4.model.HumanName
 import org.hl7.fhir.r4.model.Meta

@@ -347,9 +347,9 @@ class ExpressionEvaluatorTest {
         questionnaire,
         QuestionnaireResponse(),
         xFhirQueryResolver =
-        XFhirQueryResolver {
-          return@XFhirQueryResolver listOf(patient)
-        }
+          XFhirQueryResolver {
+            return@XFhirQueryResolver listOf(patient)
+          }
       )
 
     val resultAsResourceList = (result as Bundle).entry.map { it.resource }
