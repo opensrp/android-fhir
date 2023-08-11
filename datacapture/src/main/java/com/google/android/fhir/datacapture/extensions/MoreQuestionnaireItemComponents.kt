@@ -673,9 +673,16 @@ internal fun Questionnaire.QuestionnaireItemComponent.extractAnswerOptions(
  * Flatten a nested list of [Questionnaire.QuestionnaireItemComponent] recursively and returns a
  * flat list of all items into list embedded at any level
  */
-fun List<Questionnaire.QuestionnaireItemComponent>.flattened():
-  List<Questionnaire.QuestionnaireItemComponent> {
-  return this + this.flatMap { it.item.flattened() }
+fun List<Questionnaire.QuestionnaireItemComponent>.flattened(): List<Questionnaire.QuestionnaireItemComponent> =
+  mutableListOf<Questionnaire.QuestionnaireItemComponent>().also { flattenInto(it) }
+
+private fun List<Questionnaire.QuestionnaireItemComponent>.flattenInto(
+  output: MutableList<Questionnaire.QuestionnaireItemComponent>
+) {
+  forEach {
+    output.add(it)
+    it.item.flattenInto(output)
+  }
 }
 
 val Resource.logicalId: String
