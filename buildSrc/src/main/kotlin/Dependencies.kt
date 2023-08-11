@@ -269,7 +269,7 @@ object Dependencies {
     const val hapiFhir = "6.0.1"
     // Newer versions don't work on Android due to Apache Commons Codec:
     // Wait for this fix: https://github.com/hapifhir/org.hl7.fhir.core/issues/1046
-    const val hapiFhirCore = "5.6.36"
+    const val hapiFhirCore = "5.6.90"
 
     const val http = "4.9.1"
     const val jackson = "2.14.1"
