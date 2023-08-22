@@ -113,15 +113,19 @@ internal class FhirEngineImpl(private val database: Database, private val contex
     download: suspend () -> Flow<List<Resource>>
   ) {
     download().collect { resources ->
-      database.withTransaction {
-        val resolved =
-          resolveConflictingResources(
-            resources,
-            getConflictingResourceIds(resources),
-            conflictResolver
-          )
-        database.insertSyncedResources(resources)
-        saveResolvedResourcesToDatabase(resolved)
+      try {
+        database.withTransaction {
+          val resolved =
+            resolveConflictingResources(
+              resources,
+              getConflictingResourceIds(resources),
+              conflictResolver
+            )
+          database.insertSyncedResources(resources)
+          saveResolvedResourcesToDatabase(resolved)
+        }
+      } catch (exception: Exception) {
+        Timber.e(exception, "Error encountered while inserting synced resources")
       }
     }
   }
