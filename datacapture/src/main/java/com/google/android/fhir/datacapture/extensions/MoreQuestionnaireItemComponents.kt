@@ -629,13 +629,17 @@ val Questionnaire.QuestionnaireItemComponent.enableWhenExpression: Expression?
  * value.
  */
 private fun Questionnaire.QuestionnaireItemComponent.createQuestionnaireResponseItemAnswers():
-  MutableList<
-    QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent
-  >? { // https://build.fhir.org/ig/HL7/sdc/behavior.html#initial
+  MutableList<QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent>? {
+  require(answerOption.initial.isEmpty() || initial.isEmpty()) {
+    "Questionnaire item $linkId has both initial value(s) and has answerOption. See rule que-11 at https://www.hl7.org/fhir/questionnaire-definitions.html#Questionnaire.item.initial."
+  }
+
+  // https://build.fhir.org/ig/HL7/sdc/behavior.html#initial
   // quantity given as initial without value is for unit reference purpose only. Answer conversion
   // not needed
-  if (initial.isEmpty() ||
-      (initialFirstRep.hasValueQuantity() && initialFirstRep.valueQuantity.value == null)
+  if (answerOption.initial.isEmpty() &&
+      (initial.isEmpty() ||
+        (initialFirstRep.hasValueQuantity() && initialFirstRep.valueQuantity.value == null))
   ) {
     return null
   }
@@ -648,16 +652,16 @@ private fun Questionnaire.QuestionnaireItemComponent.createQuestionnaireResponse
     )
   }
 
-  if (initial.size > 1 && !repeats) {
+  if ((answerOption.initial.size > 1 || initial.size > 1) && !repeats) {
     throw IllegalArgumentException(
       "Questionnaire item $linkId can only have multiple initial values for repeating items. See rule que-13 at https://www.hl7.org/fhir/questionnaire-definitions.html#Questionnaire.item.initial."
     )
   }
 
   return initial
-    .map {
-      QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply { value = it.value }
-    }
+    .map { it.value }
+    .plus(answerOption.initial)
+    .map { QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply { value = it } }
     .toMutableList()
 }
 
