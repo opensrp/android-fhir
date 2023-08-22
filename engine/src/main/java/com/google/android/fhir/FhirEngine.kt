@@ -19,6 +19,7 @@ package com.google.android.fhir
 import com.google.android.fhir.db.ResourceNotFoundException
 import com.google.android.fhir.db.impl.dao.LocalChangeToken
 import com.google.android.fhir.search.Search
+import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.sync.ConflictResolver
 import java.time.OffsetDateTime
 import kotlinx.coroutines.flow.Flow
@@ -47,6 +48,12 @@ interface FhirEngine {
    * Searches the database and returns a list resources according to the [search] specifications.
    */
   suspend fun <R : Resource> search(search: Search): List<SearchResult<R>>
+
+
+  /**
+   * Searches the database and returns a list resources according to the [search] specifications.
+   */
+  suspend fun <R : Resource> search(searchQuery: SearchQuery): List<R>
 
   /**
    * Synchronizes the [upload] result in the database. [upload] operation may result in multiple
