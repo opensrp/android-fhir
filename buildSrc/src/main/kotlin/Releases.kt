@@ -15,7 +15,6 @@
  */
 
 import org.gradle.api.Project
-import org.gradle.api.artifacts.repositories.PasswordCredentials
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.kotlin.dsl.configure
@@ -75,7 +74,7 @@ object Releases {
 
   object Knowledge : LibraryArtifact {
     override val artifactId = "knowledge"
-    override val version = "0.1.0-alpha01-preview-SNAPSHOT"
+    override val version = "0.1.0-alpha01-preview2-SNAPSHOT"
     override val name = "Android FHIR Knowledge Manager Library"
   }
 
@@ -127,11 +126,13 @@ fun Project.publishArtifact(artifact: LibraryArtifact) {
                   artifact.version
                 }
             }
-            maven {
-              credentials(PasswordCredentials::class)
-              url = uri("https://oss.sonatype.org/content/repositories/snapshots")
-              name = "sonatype"
-            }
+            // Weird quirk, build fails with this entry. Reverting to individual configuration per
+            // module
+            //            maven {
+            //              credentials(PasswordCredentials::class)
+            //              url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+            //              name = "sonatype"
+            //            }
           }
         }
       }
