@@ -20,6 +20,7 @@ import ca.uhn.fhir.context.FhirContext
 import ca.uhn.fhir.context.FhirVersionEnum
 import org.hl7.fhir.instance.model.api.IBaseBundle
 import org.hl7.fhir.instance.model.api.IBaseResource
+import org.hl7.fhir.r4.model.BaseResource
 import org.hl7.fhir.r4.model.Bundle
 import org.hl7.fhir.r4.model.Coding
 import org.hl7.fhir.r4.model.Endpoint
@@ -54,7 +55,7 @@ import org.skyscreamer.jsonassert.JSONAssert
 
 object PlanDefinition : Loadable() {
   private val fhirContext = FhirContext.forCached(FhirVersionEnum.R4)
-  private val jsonParser = fhirContext.newJsonParser()
+  val jsonParser = fhirContext.newJsonParser()
 
   fun parse(assetName: String): IBaseResource {
     return jsonParser.parseResource(open(assetName))
@@ -164,7 +165,7 @@ object PlanDefinition : Loadable() {
     private val patientID: String?,
     private val encounterID: String?
   ) {
-    private val fhirDal = FakeFhirDal()
+    val fhirDal = FakeFhirDal()
     private lateinit var dataEndpoint: Endpoint
     private lateinit var libraryEndpoint: Endpoint
     private lateinit var baseResource: IBaseResource
@@ -191,6 +192,33 @@ object PlanDefinition : Loadable() {
     }
 
     fun apply(): GeneratedCarePlan {
+      return GeneratedCarePlan(
+        buildProcessor(fhirDal)
+          .apply(
+            IdType("PlanDefinition", planDefinitionID),
+            patientID,
+            encounterID,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            Parameters(),
+            null,
+            baseResource as Bundle,
+            null,
+            dataEndpoint,
+            libraryEndpoint,
+            libraryEndpoint
+          )
+      )
+    }
+
+    fun apply(baseResource: BaseResource): GeneratedCarePlan {
+      fhirDal.addAll(baseResource)
       return GeneratedCarePlan(
         buildProcessor(fhirDal)
           .apply(

@@ -16,6 +16,7 @@
 
 package com.google.android.fhir.workflow.testing
 
+import java.io.File
 import java.io.InputStream
 
 open class Loadable {

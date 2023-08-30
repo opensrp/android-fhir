@@ -18,11 +18,10 @@ package com.google.android.fhir.workflow.testing
 
 import ca.uhn.fhir.context.FhirContext
 import ca.uhn.fhir.context.FhirVersionEnum
-import java.io.InputStream
-import java.io.StringReader
 import org.cqframework.cql.cql2elm.CqlTranslator
 import org.cqframework.cql.cql2elm.CqlTranslatorOptions
 import org.cqframework.cql.cql2elm.LibraryManager
+import org.cqframework.cql.cql2elm.LibrarySourceProvider
 import org.cqframework.cql.cql2elm.ModelManager
 import org.cqframework.cql.cql2elm.quick.FhirLibrarySourceProvider
 import org.fhir.ucum.UcumEssenceService
@@ -33,6 +32,8 @@ import org.hl7.fhir.r4.model.Library
 import org.junit.Assert.fail
 import org.opencds.cqf.cql.engine.serializing.CqlLibraryReaderFactory
 import org.skyscreamer.jsonassert.JSONAssert
+import java.io.InputStream
+import java.io.StringReader
 
 object CqlBuilder : Loadable() {
   private val jsonParser = FhirContext.forCached(FhirVersionEnum.R4).newJsonParser()
@@ -57,11 +58,11 @@ object CqlBuilder : Loadable() {
    * @param cqlText the CQL Library
    * @return a [CqlTranslator] object that contains the elm representation of the library inside it.
    */
-  fun compile(cqlText: String): CqlTranslator {
+  fun compile(cqlText: String, librarySourceProvider: LibrarySourceProvider? = null): CqlTranslator {
     val modelManager = ModelManager()
     val libraryManager =
       LibraryManager(modelManager).apply {
-        librarySourceLoader.registerProvider(FhirLibrarySourceProvider())
+        librarySourceLoader.registerProvider(librarySourceProvider?:FhirLibrarySourceProvider())
       }
 
     val translator =
@@ -166,9 +167,9 @@ object CqlBuilder : Loadable() {
    * @param cqlInputStream the CQL Library
    * @return the assembled FHIR Library
    */
-  fun compileAndBuild(cqlInputStream: InputStream): Library {
+  fun compileAndBuild(cqlInputStream: InputStream, librarySourceProvider: LibrarySourceProvider? = null): Library {
     val cqlText = load(cqlInputStream)
-    return compile(cqlText).let {
+    return compile(cqlText, librarySourceProvider).let {
       assembleFhirLib(
         cqlText,
         it.toJson(),

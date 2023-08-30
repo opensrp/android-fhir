@@ -1,0 +1,57 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "IMMZ.DT.01.BCG",
+  "url": "http://fhir.org/guides/who/smart-immunization/PlanDefinition/IMMZ.DT.01.BCG",
+  "version": "0.1.0",
+  "name": "IMMZ.DT.01.BCG",
+  "title": "IMMZ.DT.01.BCG",
+  "status": "draft",
+  "date": "2023-08-09T14:36:29+00:00",
+  "publisher": "World Health Organization (WHO)",
+  "description": "If child or person has not been vaccinated, give BCG vaccine as soon as possible after birth",
+  "jurisdiction": [
+    {
+      "coding": [
+        {
+          "system": "http://unstats.un.org/unsd/methods/m49/m49.htm",
+          "code": "001"
+        }
+      ]
+    }
+  ],
+  "library": [
+    "http://fhir.org/guides/who/smart-immunization/Library/IMMZDT01"
+  ],
+  "action": [
+    {
+      "title": "Schedule Patient for BCG",
+      "description": "Schedule BCG immunizations",
+      "condition": [
+        {
+          "kind": "applicability",
+          "expression": {
+            "description": "Provision of the BCG dose",
+            "language": "text/cql-identifier",
+            "expression": "Provision of the BCG dose"
+          }
+        }
+      ],
+      "definitionCanonical": "http://fhir.org/guides/who/smart-immunization/ActivityDefinition/IMMZ.DT.01.BCG.01"
+    },
+    {
+      "title": "Remind Patient for BCG dose",
+      "description": "Reminder Patient for BCG dose",
+      "condition": [
+        {
+          "kind": "applicability",
+          "expression": {
+            "description": "Should Send BCG Reminder",
+            "language": "text/cql-identifier",
+            "expression": "Should Send BCG Reminder"
+          }
+        }
+      ],
+      "definitionCanonical": "http://fhir.org/guides/who/smart-immunization/ActivityDefinition/IMMZ.DT.01.BCG.CR"
+    }
+  ]
+}
