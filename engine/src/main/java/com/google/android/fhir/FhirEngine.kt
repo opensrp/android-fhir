@@ -33,6 +33,8 @@ interface FhirEngine {
    */
   suspend fun create(vararg resource: Resource): List<String>
 
+  suspend fun createRemote(vararg resource: Resource)
+
   /** Loads a FHIR resource given the class and the logical ID. */
   suspend fun get(type: ResourceType, id: String): Resource
 
@@ -94,7 +96,7 @@ interface FhirEngine {
    * an empty list.
    */
   suspend fun getLocalChanges(type: ResourceType, id: String): List<LocalChange>
-
+  suspend fun getUnsyncedLocalChanges(): List<SquashedLocalChange>
   /**
    * Purges a resource from the database based on resource type and id without any deletion of data
    * from the server.

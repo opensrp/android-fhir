@@ -43,6 +43,10 @@ internal class FhirEngineImpl(private val database: Database, private val contex
     return database.insert(*resource)
   }
 
+  override suspend fun createRemote(vararg resource: Resource) {
+    return database.insertRemote(*resource)
+  }
+
   override suspend fun get(type: ResourceType, id: String): Resource {
     return database.select(type, id)
   }
@@ -74,6 +78,9 @@ internal class FhirEngineImpl(private val database: Database, private val contex
   override suspend fun getLocalChanges(type: ResourceType, id: String): List<LocalChange> {
     return database.getLocalChanges(type, id)
   }
+  // FhirEngineImpl.kt
+  override suspend fun getUnsyncedLocalChanges(): List<SquashedLocalChange> =
+    database.getAllLocalChanges()
 
   override suspend fun purge(type: ResourceType, id: String, forcePurge: Boolean) {
     database.purge(type, id, forcePurge)
