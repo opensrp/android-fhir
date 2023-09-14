@@ -25,6 +25,7 @@ import com.google.android.fhir.SearchResult
 import com.google.android.fhir.db.Database
 import com.google.android.fhir.logicalId
 import com.google.android.fhir.search.Search
+import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.search.count
 import com.google.android.fhir.search.execute
 import com.google.android.fhir.sync.ConflictResolver
@@ -61,6 +62,33 @@ internal class FhirEngineImpl(private val database: Database, private val contex
 
   override suspend fun <R : Resource> search(search: Search): List<SearchResult<R>> {
     return search.execute(database)
+  }
+/*
+  suspend fun sample(dateFrom: Long, limit: Long) {
+
+    val searchQuery =
+      SearchQuery(
+        """
+      SELECT a.serializedResource, b.index_to
+      FROM ResourceEntity a
+      LEFT JOIN DateTimeIndexEntity b
+      ON a.resourceType = b.resourceType AND a.resourceId = b.resourceId AND b.index_name = '_lastUpdated'
+      WHERE a.resourceType = 'Patient'
+      AND a.resourceId IN (
+      SELECT resourceId FROM DateTimeIndexEntity
+      WHERE resourceType = 'Patient' AND index_name = '_lastUpdated' AND index_to > ?
+      )
+      ORDER BY b.index_from ASC
+      LIMIT ?
+    """.trimIndent(),
+        listOf(dateFrom, limit)
+      )
+
+    val patients = search<Patient>(searchQuery)
+  }*/
+
+  override suspend fun <R : Resource> search(searchQuery: SearchQuery): List<R> {
+    return database.search(searchQuery)
   }
 
   override suspend fun count(search: Search): Long {
