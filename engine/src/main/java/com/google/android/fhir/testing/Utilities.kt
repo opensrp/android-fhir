@@ -25,6 +25,7 @@ import com.google.android.fhir.LocalChange
 import com.google.android.fhir.LocalChangeToken
 import com.google.android.fhir.SearchResult
 import com.google.android.fhir.search.Search
+import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.sync.ConflictResolver
 import com.google.android.fhir.sync.DataSource
 import com.google.android.fhir.sync.DownloadWorkManager
@@ -148,6 +149,10 @@ object TestFhirEngineImpl : FhirEngine {
 
   override suspend fun <R : Resource> search(search: Search): List<SearchResult<R>> {
     return emptyList()
+  }
+
+  override suspend fun <R : Resource> search(searchQuery: SearchQuery): List<R> {
+    TODO("Not yet implemented")
   }
 
   override suspend fun syncUpload(
