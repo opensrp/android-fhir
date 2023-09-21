@@ -34,6 +34,12 @@ interface FhirEngine {
    */
   suspend fun create(vararg resource: Resource): List<String>
 
+  /**
+   * Creates one or more remote FHIR [resource]s in the local storage without flagging as local
+   * changes.
+   */
+  suspend fun createRemote(vararg resource: Resource)
+
   /** Loads a FHIR resource given the class and the logical ID. */
   suspend fun get(type: ResourceType, id: String): Resource
 
