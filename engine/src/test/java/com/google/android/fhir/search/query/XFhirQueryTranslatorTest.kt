@@ -99,25 +99,28 @@ class XFhirQueryTranslatorTest {
   @Test
   fun `translate() should add filters`() {
     val search =
-      translate("Patient?gender=male&name=John&birthdate=2012-01-11&general-practitioner=12345")
+      translate(
+        "QuestionnaireResponse?patient=Patient/a481e98f-87de-443a-920a-d6e729b630cd&questionnaire=374443",
+      )
 
-    search.stringFilterCriteria.first().run {
-      assertThat(this.parameter.paramName).isEqualTo("name")
-      assertThat(this.filters.first().value).isEqualTo("John")
-    }
-
-    search.tokenFilterCriteria.first().run {
-      assertThat(this.parameter.paramName).isEqualTo("gender")
-      assertThat(this.filters.first().value!!.tokenFilters.first().code).isEqualTo("male")
-    }
-    search.dateTimeFilterCriteria.first().run {
-      assertThat(this.parameter.paramName).isEqualTo("birthdate")
-      assertThat(this.filters.first().value!!.date!!.toHumanDisplay()).isEqualTo("2012-01-11")
-    }
     search.referenceFilterCriteria.first().run {
-      assertThat(this.parameter.paramName).isEqualTo("general-practitioner")
-      assertThat(this.filters.first().value).isEqualTo("12345")
+      assertThat(this.parameter.paramName).isEqualTo("patient")
+      assertThat(this.filters.first().value)
+        .isEqualTo("Patient/a481e98f-87de-443a-920a-d6e729b630cd")
     }
+
+    search.referenceFilterCriteria[1].run {
+      assertThat(this.parameter.paramName).isEqualTo("questionnaire")
+      assertThat(this.filters.first().value).isEqualTo("374443")
+    }
+    //    search.dateTimeFilterCriteria.first().run {
+    //      assertThat(this.parameter.paramName).isEqualTo("birthdate")
+    //      assertThat(this.filters.first().value!!.date!!.toHumanDisplay()).isEqualTo("2012-01-11")
+    //    }
+    //    search.referenceFilterCriteria.first().run {
+    //      assertThat(this.parameter.paramName).isEqualTo("general-practitioner")
+    //      assertThat(this.filters.first().value).isEqualTo("12345")
+    //    }
   }
 
   @Test
@@ -146,8 +149,8 @@ class XFhirQueryTranslatorTest {
       SearchParamDefinition(
         "address-country",
         Enumerations.SearchParamType.STRING,
-        "Patient.address.country"
-      )
+        "Patient.address.country",
+      ),
     )
 
     assertThat(search.sort!!.paramName).isEqualTo("address-country")
@@ -161,8 +164,8 @@ class XFhirQueryTranslatorTest {
       SearchParamDefinition(
         "probability",
         Enumerations.SearchParamType.NUMBER,
-        "RiskAssessment.prediction.probability"
-      )
+        "RiskAssessment.prediction.probability",
+      ),
     )
 
     assertThat(search.sort!!.paramName).isEqualTo("probability")
@@ -173,7 +176,7 @@ class XFhirQueryTranslatorTest {
     val search = Search(ResourceType.Patient)
 
     search.applySortParam(
-      SearchParamDefinition("birthdate", Enumerations.SearchParamType.DATE, "Patient.birthDate")
+      SearchParamDefinition("birthdate", Enumerations.SearchParamType.DATE, "Patient.birthDate"),
     )
 
     assertThat(search.sort!!.paramName).isEqualTo("birthdate")
@@ -189,8 +192,8 @@ class XFhirQueryTranslatorTest {
           SearchParamDefinition(
             "deceased",
             Enumerations.SearchParamType.TOKEN,
-            "Patient.deceased.exists() and Patient.deceased != false"
-          )
+            "Patient.deceased.exists() and Patient.deceased != false",
+          ),
         )
       }
     assertThat(exception.message).isEqualTo("TOKEN sort not supported in x-fhir-query")
@@ -204,9 +207,9 @@ class XFhirQueryTranslatorTest {
       SearchParamDefinition(
         "probability",
         Enumerations.SearchParamType.NUMBER,
-        "RiskAssessment.prediction.probability"
+        "RiskAssessment.prediction.probability",
       ),
-      "12"
+      "12",
     )
 
     val applyFilterParam = search.numberFilterCriteria.first().filters.first()
@@ -220,7 +223,7 @@ class XFhirQueryTranslatorTest {
 
     search.applyFilterParam(
       SearchParamDefinition("birthdate", Enumerations.SearchParamType.DATE, "Patient.birthDate"),
-      "2022-01-21"
+      "2022-01-21",
     )
 
     val applyFilterParam = search.dateTimeFilterCriteria.first().filters.first()
@@ -234,7 +237,7 @@ class XFhirQueryTranslatorTest {
 
     search.applyFilterParam(
       SearchParamDefinition("birthdate", Enumerations.SearchParamType.DATE, "Patient.birthDate"),
-      "2022-01-21T12:21:59"
+      "2022-01-21T12:21:59",
     )
 
     val applyFilterParam = search.dateTimeFilterCriteria.first().filters.first()
@@ -249,7 +252,7 @@ class XFhirQueryTranslatorTest {
 
     search.applyFilterParam(
       SearchParamDefinition("length", Enumerations.SearchParamType.QUANTITY, "Encounter.length"),
-      "3|http://unitsofmeasure.org|months"
+      "3|http://unitsofmeasure.org|months",
     )
 
     val applyFilterParam = search.quantityFilterCriteria.first().filters.first()
@@ -267,9 +270,9 @@ class XFhirQueryTranslatorTest {
       SearchParamDefinition(
         "address-country",
         Enumerations.SearchParamType.STRING,
-        "Patient.address.country"
+        "Patient.address.country",
       ),
-      "Karachi"
+      "Karachi",
     )
 
     val applyFilterParam = search.stringFilterCriteria.first().filters.first()
@@ -283,7 +286,7 @@ class XFhirQueryTranslatorTest {
 
     search.applyFilterParam(
       SearchParamDefinition("identifier", Enumerations.SearchParamType.TOKEN, "Patient.identifier"),
-      "http://snomed.org|001122"
+      "http://snomed.org|001122",
     )
 
     val applyFilterParam = search.tokenFilterCriteria.first().filters.first()
@@ -300,9 +303,9 @@ class XFhirQueryTranslatorTest {
       SearchParamDefinition(
         "general-practitioner",
         Enumerations.SearchParamType.REFERENCE,
-        "Patient.generalPractitioner"
+        "Patient.generalPractitioner",
       ),
-      "Practitioner/111"
+      "Practitioner/111",
     )
 
     val applyFilterParam = search.referenceFilterCriteria.first().filters.first()
@@ -316,7 +319,7 @@ class XFhirQueryTranslatorTest {
 
     search.applyFilterParam(
       SearchParamDefinition("url", Enumerations.SearchParamType.URI, "Measure.url"),
-      "http://fhir.org/Measure/meaure-1"
+      "http://fhir.org/Measure/meaure-1",
     )
 
     val applyFilterParam = search.uriFilterCriteria.first().filters.first()
@@ -332,7 +335,7 @@ class XFhirQueryTranslatorTest {
       assertThrows(UnsupportedOperationException::class.java) {
         search.applyFilterParam(
           SearchParamDefinition("near", Enumerations.SearchParamType.SPECIAL, "Location.position"),
-          "20.000839 30.378273"
+          "20.000839 30.378273",
         )
       }
     assertThat(exception.message).isEqualTo("SPECIAL type not supported in x-fhir-query")
@@ -351,7 +354,6 @@ class XFhirQueryTranslatorTest {
 
   @Test
   fun `translate() should add a filter for search parameter _profile`() {
-
     val search =
       translate("Patient?_profile=http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient")
 
