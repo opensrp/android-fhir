@@ -16,6 +16,7 @@
 
 package com.google.android.fhir.datacapture.fhirpath
 
+import android.util.Log
 import com.google.android.fhir.datacapture.extensions.calculatedExpression
 import com.google.android.fhir.datacapture.extensions.findVariableExpression
 import com.google.android.fhir.datacapture.extensions.flattened
@@ -147,6 +148,8 @@ internal class ExpressionEvaluator(
             )
             .map { it.castToType(it) }
         item to updatedAnswer
+      }.apply {
+        Log.d("FIKRI", "TOTAL CALCULATION PER ITEM: ${this.size}")
       }
   }
 
