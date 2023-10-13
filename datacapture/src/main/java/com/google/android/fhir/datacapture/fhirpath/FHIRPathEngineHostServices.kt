@@ -32,8 +32,12 @@ import timber.log.Timber
  * Resolves constants defined in the fhir path expressions beyond those defined in the specification
  */
 internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
-  override fun resolveConstant(appContext: Any?, name: String?, beforeContext: Boolean): Base? =
-    (appContext as? Map<*, *>)?.get(name) as? Base
+  override fun resolveConstant(
+    appContext: Any?,
+    name: String?,
+    beforeContext: Boolean,
+  ): List<Base>? =
+    ((appContext as? Map<*, *>)?.get(name) as? Base)?.let { listOf(it) } ?: emptyList()
 
   override fun resolveConstantType(appContext: Any?, name: String?): TypeDetails {
     throw UnsupportedOperationException()
@@ -42,7 +46,7 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
   override fun log(argument: String?, focus: MutableList<Base>?): Boolean {
     throw UnsupportedOperationException()
   }
-
+ 
   override fun resolveFunction(functionName: String?): FunctionDetails {
     return when (functionName) {
       Function.ABS -> FunctionDetails("Returns the absolute value of the input", 0, 0)
@@ -55,7 +59,7 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
   override fun checkFunction(
     appContext: Any?,
     functionName: String?,
-    parameters: MutableList<TypeDetails>?
+    parameters: MutableList<TypeDetails>?,
   ): TypeDetails {
     throw UnsupportedOperationException()
   }
@@ -64,7 +68,7 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
     appContext: Any?,
     focus: MutableList<Base>?,
     functionName: String?,
-    parameters: MutableList<MutableList<Base>>?
+    parameters: MutableList<MutableList<Base>>?,
   ): MutableList<Base> {
 
     return when (functionName) {
@@ -75,7 +79,7 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
     }
   }
 
-  override fun resolveReference(appContext: Any?, url: String?): Base {
+  override fun resolveReference(appContext: Any?, url: String?, refContext: Base?): Base? {
     throw UnsupportedOperationException()
   }
 
@@ -83,7 +87,7 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
     throw UnsupportedOperationException()
   }
 
-  override fun resolveValueSet(appContext: Any?, url: String?): ValueSet {
+  override fun resolveValueSet(appContext: Any?, url: String?): ValueSet? {
     throw UnsupportedOperationException()
   }
 
