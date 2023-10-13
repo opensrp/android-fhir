@@ -44,7 +44,11 @@ import timber.log.Timber
 internal class FhirEngineImpl(private val database: Database, private val context: Context) :
   FhirEngine {
   override suspend fun create(vararg resource: Resource, isLocalOnly: Boolean): List<String> {
-    return if (isLocalOnly) database.insertLocalOnly(*resource) else database.insert(*resource)
+    return if (isLocalOnly) {
+      database.insertLocalOnly(*resource).map { it.toString() }
+    } else {
+      database.insert(*resource)
+    }
   }
 
   override suspend fun get(type: ResourceType, id: String): Resource {
@@ -78,6 +82,7 @@ internal class FhirEngineImpl(private val database: Database, private val contex
   override suspend fun getLocalChanges(type: ResourceType, id: String): List<LocalChange> {
     return database.getLocalChanges(type, id)
   }
+
   // FhirEngineImpl.kt
   override suspend fun getUnsyncedLocalChanges(): List<LocalChange> = database.getAllLocalChanges()
 
