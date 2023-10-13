@@ -43,7 +43,7 @@ internal class Uploader(
   private val dataSource: DataSource,
 ) {
   private val patchGenerator = PerResourcePatchGenerator
-  private val requestGenerator = TransactionBundleGenerator.getDefault()
+  private val requestGenerator = TransactionBundleGenerator.getDefault(useETagForUpload = false)
 
   suspend fun upload(localChanges: List<LocalChange>): Flow<UploadState> = flow {
     val patches = patchGenerator.generate(localChanges)
