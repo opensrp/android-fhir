@@ -46,7 +46,7 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
   override fun log(argument: String?, focus: MutableList<Base>?): Boolean {
     throw UnsupportedOperationException()
   }
- 
+
   override fun resolveFunction(functionName: String?): FunctionDetails {
     return when (functionName) {
       Function.ABS -> FunctionDetails("Returns the absolute value of the input", 0, 0)
@@ -70,7 +70,6 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
     functionName: String?,
     parameters: MutableList<MutableList<Base>>?,
   ): MutableList<Base> {
-
     return when (functionName) {
       Function.ABS -> computeAbs(focus)
       Function.POW -> computePow(focus, parameters)
@@ -107,7 +106,7 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
 
   private fun computePow(
     focus: MutableList<Base>?,
-    parameters: MutableList<MutableList<Base>>?
+    parameters: MutableList<MutableList<Base>>?,
   ): MutableList<Base> {
     val results: MutableList<Base> = mutableListOf()
     focus?.let { f ->
@@ -119,8 +118,9 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
       try {
         val result = focusPrimitiveStringValue.toDouble().pow(paramPrimitiveStringValue.toDouble())
         if (f[0] is DecimalType || parameters[0][0] is DecimalType) results.add(DecimalType(result))
-        if (f[0] is IntegerType && parameters[0][0] is IntegerType)
+        if (f[0] is IntegerType && parameters[0][0] is IntegerType) {
           results.add(IntegerType(result.toInt()))
+        }
       } catch (e: NumberFormatException) {
         Timber.e("Error: " + e.message)
       }
@@ -136,7 +136,7 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
         val primitiveStringValue = focusItem.primitiveValue()
         when (focusItem) {
           is IntegerType,
-          is DecimalType -> results.add(DecimalType(exp(primitiveStringValue.toDouble())))
+          is DecimalType, -> results.add(DecimalType(exp(primitiveStringValue.toDouble())))
           else -> throw IllegalArgumentException("Wrong type of operand supplied")
         }
       }
