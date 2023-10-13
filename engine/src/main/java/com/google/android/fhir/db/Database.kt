@@ -25,6 +25,7 @@ import com.google.android.fhir.search.SearchQuery
 import java.time.Instant
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
+import java.util.UUID
 
 /** The interface for the FHIR resource database. */
 internal interface Database {
@@ -44,7 +45,7 @@ internal interface Database {
    * @param <R> The resource type
    * @return the logical IDs of the newly created resources.
    */
-  suspend fun <R : Resource> insertLocalOnly(vararg resource: R): List<String>
+  suspend fun <R : Resource> insertLocalOnly(vararg resource: R): List<UUID>
 
   /**
    * Inserts a list of remote `resources` into the FHIR resource database. If any of the resources

@@ -36,6 +36,7 @@ import com.google.android.fhir.toLocalChange
 import java.time.Instant
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
+import java.util.UUID
 
 /**
  * The implementation for the persistence layer using Room. See docs for
@@ -131,7 +132,7 @@ internal class DatabaseImpl(
     return logicalIds
   }
 
-  override suspend fun <R : Resource> insertLocalOnly(vararg resource: R): List<String> {
+  override suspend fun <R : Resource> insertLocalOnly(vararg resource: R): List<UUID> {
     return db.withTransaction { resourceDao.insertAllRemote(resource.toList()) }
   }
 
