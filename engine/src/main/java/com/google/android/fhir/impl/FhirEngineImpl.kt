@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
+import timber.log.Timber
 
 /** Implementation of [FhirEngine]. */
 internal class FhirEngineImpl(private val database: Database, private val context: Context) :
@@ -87,15 +88,19 @@ internal class FhirEngineImpl(private val database: Database, private val contex
     download: suspend () -> Flow<List<Resource>>,
   ) {
     download().collect { resources ->
-      database.withTransaction {
-        val resolved =
-          resolveConflictingResources(
-            resources,
-            getConflictingResourceIds(resources),
-            conflictResolver,
-          )
-        database.insertSyncedResources(resources)
-        saveResolvedResourcesToDatabase(resolved)
+      try {
+        database.withTransaction {
+          val resolved =
+            resolveConflictingResources(
+              resources,
+              getConflictingResourceIds(resources),
+              conflictResolver,
+            )
+          database.insertSyncedResources(resources)
+          saveResolvedResourcesToDatabase(resolved)
+        }
+      } catch (exception: Exception) {
+        Timber.e(exception, "Error encountered while inserting synced resources")
       }
     }
   }
