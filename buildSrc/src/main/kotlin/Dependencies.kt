@@ -133,7 +133,7 @@ object Dependencies {
       "com.google.mlkit:object-detection-custom:${Versions.Mlkit.objectDetectionCustom}"
   }
 
-  const val androidFhirGroup = "com.google.android.fhir"
+  const val androidFhirGroup = "org.smartregister"
   const val androidFhirEngineModule = "engine"
   const val androidFhirKnowledgeModule = "knowledge"
   const val androidFhirCommon = "$androidFhirGroup:common:${Versions.androidFhirCommon}"
