@@ -230,7 +230,7 @@ object Dependencies {
     const val guava = "32.1.2-android"
 
     const val hapiFhir = "6.8.0"
-    const val hapiFhirCore = "6.1.16"
+    const val hapiFhirCore = "6.0.22"
 
     const val http = "4.11.0"
 
@@ -301,7 +301,7 @@ object Dependencies {
 
   fun Configuration.forceHapiVersion() {
     // Removes newer versions of caffeine and manually imports 2.9
-    // Removes newer versions of hapi and keeps on 6.1.16
+    // Removes newer versions of hapi and keeps on 6.0.1
     // (newer versions don't work on Android)
     resolutionStrategy {
       force(HapiFhir.fhirBase)
