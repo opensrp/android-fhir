@@ -20,6 +20,7 @@ import org.hl7.fhir.r4.model.Base
 import org.hl7.fhir.r4.model.TypeDetails
 import org.hl7.fhir.r4.model.ValueSet
 import org.hl7.fhir.r4.utils.FHIRPathEngine
+import org.hl7.fhir.r4.utils.FHIRPathUtilityClasses
 
 /**
  * Resolves constants defined in the fhir path expressions beyond those defined in the specification
@@ -40,9 +41,7 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
     throw UnsupportedOperationException()
   }
 
-  override fun resolveFunction(
-    functionName: String?,
-  ): FHIRPathEngine.IEvaluationContext.FunctionDetails {
+  override fun resolveFunction(functionName: String?): FHIRPathUtilityClasses.FunctionDetails {
     throw UnsupportedOperationException()
   }
 
