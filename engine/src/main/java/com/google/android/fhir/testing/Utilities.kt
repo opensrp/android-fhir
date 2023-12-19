@@ -197,6 +197,10 @@ object TestFhirEngineImpl : FhirEngine {
     )
   }
 
+  override suspend fun getUnsyncedLocalChanges(): List<LocalChange> {
+    TODO("Not yet implemented")
+  }
+
   override suspend fun purge(type: ResourceType, id: String, forcePurge: Boolean) {}
 }
 
