@@ -108,6 +108,8 @@ interface FhirEngine {
    */
   suspend fun getLocalChanges(type: ResourceType, id: String): List<LocalChange>
 
+  suspend fun getUnsyncedLocalChanges(): List<LocalChange>
+
   /**
    * Purges a resource from the database based on resource type and id without any deletion of data
    * from the server.
