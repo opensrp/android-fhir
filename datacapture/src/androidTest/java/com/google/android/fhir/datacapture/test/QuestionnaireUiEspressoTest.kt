@@ -30,6 +30,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import ca.uhn.fhir.context.FhirContext
 import ca.uhn.fhir.context.FhirVersionEnum
@@ -85,22 +86,22 @@ class QuestionnaireUiEspressoTest {
     onView(withId(R.id.review_mode_button))
       .check(
         ViewAssertions.matches(
-          ViewMatchers.withEffectiveVisibility(ViewMatchers.Visibility.VISIBLE)
-        )
+          ViewMatchers.withEffectiveVisibility(ViewMatchers.Visibility.VISIBLE),
+        ),
       )
 
     clickOnText("Yes")
     onView(withId(R.id.review_mode_button))
       .check(
-        ViewAssertions.matches(ViewMatchers.withEffectiveVisibility(ViewMatchers.Visibility.GONE))
+        ViewAssertions.matches(ViewMatchers.withEffectiveVisibility(ViewMatchers.Visibility.GONE)),
       )
 
     clickOnText("No")
     onView(withId(R.id.review_mode_button))
       .check(
         ViewAssertions.matches(
-          ViewMatchers.withEffectiveVisibility(ViewMatchers.Visibility.VISIBLE)
-        )
+          ViewMatchers.withEffectiveVisibility(ViewMatchers.Visibility.VISIBLE),
+        ),
       )
   }
 
@@ -274,7 +275,7 @@ class QuestionnaireUiEspressoTest {
               val maxDate = DateType(Date()).apply { add(Calendar.YEAR, 4) }
               setValue(maxDate)
             }
-          }
+          },
         )
       }
 
@@ -293,7 +294,7 @@ class QuestionnaireUiEspressoTest {
       QuestionnaireResponseValidator.validateQuestionnaireResponse(
         questionnaire,
         getQuestionnaireResponse(),
-        context
+        context,
       )
 
     assertThat(validationResult["link-1"]?.first()).isEqualTo(Valid)
@@ -318,7 +319,7 @@ class QuestionnaireUiEspressoTest {
               url = "http://hl7.org/fhir/StructureDefinition/maxValue"
               setValue(maxDate)
             }
-          }
+          },
         )
       }
 
@@ -334,7 +335,7 @@ class QuestionnaireUiEspressoTest {
       QuestionnaireResponseValidator.validateQuestionnaireResponse(
         questionnaire,
         getQuestionnaireResponse(),
-        context
+        context,
       )
 
     assertThat((validationResult["link-1"]?.first() as Invalid).getSingleStringValidationMessage())
@@ -360,7 +361,7 @@ class QuestionnaireUiEspressoTest {
               val maxDate = DateType(Date()).apply { add(Calendar.YEAR, 2) }
               setValue(maxDate)
             }
-          }
+          },
         )
       }
 
@@ -376,7 +377,7 @@ class QuestionnaireUiEspressoTest {
       QuestionnaireResponseValidator.validateQuestionnaireResponse(
         questionnaire,
         getQuestionnaireResponse(),
-        context
+        context,
       )
 
     assertThat((validationResult["link-1"]?.first() as Invalid).getSingleStringValidationMessage())
@@ -403,7 +404,7 @@ class QuestionnaireUiEspressoTest {
               val maxDate = DateType(Date()).apply { add(Calendar.YEAR, -1) }
               setValue(maxDate)
             }
-          }
+          },
         )
       }
 
@@ -478,7 +479,26 @@ class QuestionnaireUiEspressoTest {
     }
   }
 
-  private fun buildFragmentFromQuestionnaire(fileName: String, isReviewMode: Boolean = false) {
+  @Test
+  @SdkSuppress(minSdkVersion = 33)
+  fun clearAllAnswers_shouldClearDraftAnswer() {
+    val questionnaireFragment = buildFragmentFromQuestionnaire("/component_date_picker.json")
+    // Add month and day. No need to add slashes as they are added automatically
+    onView(withId(R.id.text_input_edit_text))
+      .perform(ViewActions.click())
+      .perform(ViewActions.typeTextIntoFocusedView("0105"))
+
+    questionnaireFragment.clearAllAnswers()
+
+    onView(withId(R.id.text_input_edit_text)).check { view, _ ->
+      assertThat((view as TextInputEditText).text.toString()).isEmpty()
+    }
+  }
+
+  private fun buildFragmentFromQuestionnaire(
+    fileName: String,
+    isReviewMode: Boolean = false,
+  ): QuestionnaireFragment {
     val questionnaireJsonString = readFileFromAssets(fileName)
     val questionnaireFragment =
       QuestionnaireFragment.builder()
@@ -491,11 +511,12 @@ class QuestionnaireUiEspressoTest {
         add(R.id.container_holder, questionnaireFragment)
       }
     }
+    return questionnaireFragment
   }
 
   private fun buildFragmentFromQuestionnaire(
     questionnaire: Questionnaire,
-    isReviewMode: Boolean = false
+    isReviewMode: Boolean = false,
   ) {
     val questionnaireFragment =
       QuestionnaireFragment.builder()
@@ -512,6 +533,7 @@ class QuestionnaireUiEspressoTest {
 
   private fun readFileFromAssets(filename: String) =
     javaClass.getResourceAsStream(filename)!!.bufferedReader().use { it.readText() }
+
   private fun getQuestionnaireResponse(): QuestionnaireResponse {
     var testQuestionnaireFragment: QuestionnaireFragment? = null
     activityScenarioRule.scenario.onActivity { activity ->

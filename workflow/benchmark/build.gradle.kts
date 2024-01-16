@@ -1,5 +1,3 @@
-import Dependencies.forceHapiVersion
-import Dependencies.forceJacksonVersion
 import Dependencies.removeIncompatibleDependencies
 
 plugins {
@@ -39,7 +37,7 @@ android {
         "META-INF/sun-jaxb.episode",
         "META-INF/*.kotlin_module",
         "readme.html",
-      )
+      ),
     )
   }
   kotlin { jvmToolchain(11) }
@@ -47,27 +45,21 @@ android {
 
 afterEvaluate { configureFirebaseTestLabForMicroBenchmark() }
 
-configurations {
-  all {
-    removeIncompatibleDependencies()
-    forceHapiVersion()
-    forceJacksonVersion()
-  }
-}
+configurations { all { removeIncompatibleDependencies() } }
 
 dependencies {
   androidTestImplementation(Dependencies.AndroidxTest.benchmarkJunit)
   androidTestImplementation(Dependencies.AndroidxTest.extJunit)
   androidTestImplementation(Dependencies.AndroidxTest.runner)
-  androidTestImplementation(Dependencies.Cql.engineJackson)
   androidTestImplementation(Dependencies.Cql.evaluator)
-  androidTestImplementation(Dependencies.Cql.evaluatorBuilder)
+  androidTestImplementation(Dependencies.Cql.evaluatorFhirJackson)
+  androidTestImplementation(Dependencies.Cql.evaluatorFhirUtilities)
   androidTestImplementation(Dependencies.junit)
   androidTestImplementation(Dependencies.Kotlin.kotlinCoroutinesAndroid)
   androidTestImplementation(Dependencies.truth)
   androidTestImplementation(Dependencies.Androidx.workRuntimeKtx)
   androidTestImplementation(Dependencies.AndroidxTest.workTestingRuntimeKtx)
-  androidTestImplementation(Dependencies.androidFhirEngine) { exclude(module = "truth") }
+  androidTestImplementation(project(":engine"))
   androidTestImplementation(project(":knowledge")) {
     exclude(group = Dependencies.androidFhirGroup, module = Dependencies.androidFhirEngineModule)
   }
@@ -76,4 +68,10 @@ dependencies {
     exclude(group = Dependencies.androidFhirGroup, module = Dependencies.androidFhirKnowledgeModule)
   }
   androidTestImplementation(project(":workflow-testing"))
+
+  constraints {
+    Dependencies.hapiFhirConstraints().forEach { (libName, constraints) ->
+      androidTestImplementation(libName, constraints)
+    }
+  }
 }

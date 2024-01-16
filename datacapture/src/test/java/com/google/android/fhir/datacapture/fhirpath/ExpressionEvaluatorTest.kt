@@ -32,6 +32,7 @@ import org.hl7.fhir.r4.model.DateType
 import org.hl7.fhir.r4.model.Enumerations
 import org.hl7.fhir.r4.model.Expression
 import org.hl7.fhir.r4.model.HumanName
+import org.hl7.fhir.r4.model.Identifier
 import org.hl7.fhir.r4.model.IntegerType
 import org.hl7.fhir.r4.model.Location
 import org.hl7.fhir.r4.model.Patient
@@ -56,7 +57,7 @@ class ExpressionEvaluatorTest {
                 name = "A"
                 language = "text/fhirpath"
                 expression = "1"
-              }
+              },
             )
           }
         }
@@ -83,7 +84,7 @@ class ExpressionEvaluatorTest {
                 name = "A"
                 language = "text/fhirpath"
                 expression = "1"
-              }
+              },
             )
           }
           addExtension().apply {
@@ -93,7 +94,7 @@ class ExpressionEvaluatorTest {
                 name = "B"
                 language = "text/fhirpath"
                 expression = "%A + 1"
-              }
+              },
             )
           }
         }
@@ -126,7 +127,7 @@ class ExpressionEvaluatorTest {
                     name = "A"
                     language = "text/fhirpath"
                     expression = "1"
-                  }
+                  },
                 )
               }
               addItem(
@@ -141,12 +142,12 @@ class ExpressionEvaluatorTest {
                         name = "B"
                         language = "text/fhirpath"
                         expression = "%A + 1"
-                      }
+                      },
                     )
                   }
-                }
+                },
               )
-            }
+            },
           )
         }
 
@@ -154,7 +155,7 @@ class ExpressionEvaluatorTest {
         ExpressionEvaluator(
           questionnaire,
           QuestionnaireResponse(),
-          mapOf(questionnaire.item[0].item[0] to questionnaire.item[0])
+          mapOf(questionnaire.item[0].item[0] to questionnaire.item[0]),
         )
 
       val result =
@@ -178,7 +179,7 @@ class ExpressionEvaluatorTest {
                 name = "A"
                 language = "text/fhirpath"
                 expression = "1"
-              }
+              },
             )
           }
           addExtension().apply {
@@ -188,7 +189,7 @@ class ExpressionEvaluatorTest {
                 name = "B"
                 language = "text/fhirpath"
                 expression = "2"
-              }
+              },
             )
           }
           addExtension().apply {
@@ -198,7 +199,7 @@ class ExpressionEvaluatorTest {
                 name = "C"
                 language = "text/fhirpath"
                 expression = "%A + %B"
-              }
+              },
             )
           }
         }
@@ -225,7 +226,7 @@ class ExpressionEvaluatorTest {
                 name = "A"
                 language = "text/fhirpath"
                 expression = "%B + 1"
-              }
+              },
             )
           }
         }
@@ -257,7 +258,7 @@ class ExpressionEvaluatorTest {
                     name = "B"
                     language = "text/fhirpath"
                     expression = "1"
-                  }
+                  },
                 )
               }
               addExtension().apply {
@@ -267,10 +268,10 @@ class ExpressionEvaluatorTest {
                     name = "A"
                     language = "text/fhirpath"
                     expression = "%B + 1"
-                  }
+                  },
                 )
               }
-            }
+            },
           )
         }
 
@@ -302,10 +303,10 @@ class ExpressionEvaluatorTest {
                     name = "A"
                     language = "text/fhirpath"
                     expression = "%B + 1"
-                  }
+                  },
                 )
               }
-            }
+            },
           )
         }
 
@@ -333,7 +334,7 @@ class ExpressionEvaluatorTest {
                 Expression().apply {
                   language = "text/fhirpath"
                   expression = "%resource.repeat(item).where(linkId='an-item').answer.first().value"
-                }
+                },
               )
             }
           }
@@ -360,7 +361,7 @@ class ExpressionEvaluatorTest {
                 Expression().apply {
                   name = "X"
                   expression = "1"
-                }
+                },
               )
             }
           }
@@ -388,7 +389,7 @@ class ExpressionEvaluatorTest {
                   name = "X"
                   expression = "1"
                   language = "application/x-fhir-query"
-                }
+                },
               )
             }
           }
@@ -415,7 +416,7 @@ class ExpressionEvaluatorTest {
                 Expression().apply {
                   name = "X"
                   language = "text/fhirpath"
-                }
+                },
               )
             }
           }
@@ -428,6 +429,84 @@ class ExpressionEvaluatorTest {
       }
     }
   }
+
+  @Test
+  fun `should return not null value with expression for %questionnaire fhirpath supplement`() =
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          identifier =
+            listOf(
+              Identifier().apply { value = "q-identifier" },
+            )
+
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-item"
+              text = "a question"
+              type = Questionnaire.QuestionnaireItemType.GROUP
+              addExtension().apply {
+                url = EXTENSION_VARIABLE_URL
+                setValue(
+                  Expression().apply {
+                    name = "M"
+                    language = "text/fhirpath"
+                    expression = "%questionnaire.identifier.first().value"
+                  },
+                )
+              }
+            },
+          )
+        }
+
+      val expressionEvaluator = ExpressionEvaluator(questionnaire, QuestionnaireResponse())
+
+      val result =
+        expressionEvaluator.evaluateQuestionnaireItemVariableExpression(
+          questionnaire.item[0].variableExpressions.last(),
+          questionnaire.item[0],
+        )
+
+      assertThat((result as Type).asStringValue()).isEqualTo("q-identifier")
+    }
+
+  @Test
+  fun `should return not null value with expression for %qItem fhirpath supplement`() =
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-item"
+              text = "a question"
+              type = Questionnaire.QuestionnaireItemType.GROUP
+              addExtension().apply {
+                url = EXTENSION_VARIABLE_URL
+                setValue(
+                  Expression().apply {
+                    name = "M"
+                    language = "text/fhirpath"
+                    expression = "%qItem.text"
+                  },
+                )
+              }
+            },
+          )
+        }
+
+      val expressionEvaluator = ExpressionEvaluator(questionnaire, QuestionnaireResponse())
+
+      val result =
+        expressionEvaluator.evaluateQuestionnaireItemVariableExpression(
+          questionnaire.item[0].variableExpressions.last(),
+          questionnaire.item[0],
+        )
+
+      assertThat((result as Type).asStringValue()).isEqualTo("a question")
+    }
 
   @Test
   fun `should return not null value with expression dependent on answers of items for questionnaire item level`() =
@@ -448,7 +527,7 @@ class ExpressionEvaluatorTest {
                     language = "text/fhirpath"
                     expression =
                       "%resource.repeat(item).where(linkId='an-item').answer.first().value"
-                  }
+                  },
                 )
               }
               addItem(
@@ -456,9 +535,9 @@ class ExpressionEvaluatorTest {
                   linkId = "an-item"
                   text = "a question"
                   type = Questionnaire.QuestionnaireItemType.TEXT
-                }
+                },
               )
-            }
+            },
           )
         }
 
@@ -471,9 +550,9 @@ class ExpressionEvaluatorTest {
               addAnswer(
                 QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
                   value = IntegerType(2)
-                }
+                },
               )
-            }
+            },
           )
         }
 
@@ -504,16 +583,16 @@ class ExpressionEvaluatorTest {
                   this.language = "text/fhirpath"
                   this.expression =
                     "%resource.repeat(item).where(linkId='a-age-years' and answer.empty().not()).select(today() - answer.value)"
-                }
+                },
               )
             }
-          }
+          },
         )
         addItem(
           Questionnaire.QuestionnaireItemComponent().apply {
             linkId = "a-age-years"
             type = Questionnaire.QuestionnaireItemType.QUANTITY
-          }
+          },
         )
       }
 
@@ -522,7 +601,7 @@ class ExpressionEvaluatorTest {
         addItem(
           QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
             linkId = "a-birthdate"
-          }
+          },
         )
         addItem(
           QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
@@ -531,9 +610,9 @@ class ExpressionEvaluatorTest {
               listOf(
                 QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
                   this.value = Quantity(1).apply { unit = "year" }
-                }
+                },
               )
-          }
+          },
         )
       }
 
@@ -563,7 +642,7 @@ class ExpressionEvaluatorTest {
                 language = "text/fhirpath"
                 expression =
                   "%resource.repeat(item).where(linkId='a-age-years' and answer.empty().not()).select(today() - answer.value)"
-              }
+              },
             )
           }
           addItem(
@@ -576,16 +655,16 @@ class ExpressionEvaluatorTest {
                   Expression().apply {
                     this.language = "text/fhirpath"
                     this.expression = "%AGE-YEARS"
-                  }
+                  },
                 )
               }
-            }
+            },
           )
           addItem(
             Questionnaire.QuestionnaireItemComponent().apply {
               linkId = "a-age-years"
               type = Questionnaire.QuestionnaireItemType.QUANTITY
-            }
+            },
           )
         }
 
@@ -594,7 +673,7 @@ class ExpressionEvaluatorTest {
           addItem(
             QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
               linkId = "a-birthdate"
-            }
+            },
           )
           addItem(
             QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
@@ -603,9 +682,9 @@ class ExpressionEvaluatorTest {
                 listOf(
                   QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
                     this.value = Quantity(1).apply { unit = "year" }
-                  }
+                  },
                 )
-            }
+            },
           )
         }
 
@@ -622,6 +701,80 @@ class ExpressionEvaluatorTest {
     }
 
   @Test
+  fun `evaluateCalculatedExpressions should return list of calculated values with fhirpath supplement %questionnaire`() =
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          identifier = listOf(Identifier().apply { value = "Questionnaire A" })
+
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-questionnaire-reason"
+              text = "Reason"
+              type = Questionnaire.QuestionnaireItemType.STRING
+              addExtension().apply {
+                url = EXTENSION_CALCULATED_EXPRESSION_URL
+                setValue(
+                  Expression().apply {
+                    this.language = "text/fhirpath"
+                    this.expression = "%questionnaire.identifier.first().value"
+                  },
+                )
+              }
+            },
+          )
+        }
+
+      val expressionEvaluator = ExpressionEvaluator(questionnaire, QuestionnaireResponse())
+
+      val result =
+        expressionEvaluator.evaluateCalculatedExpressions(
+          questionnaire.item.elementAt(0),
+          null,
+        )
+
+      assertThat(result.first().second.first().asStringValue()).isEqualTo("Questionnaire A")
+    }
+
+  @Test
+  fun `evaluateCalculatedExpressions should return list of calculated values with fhirpath supplement %qItem`() =
+    runBlocking {
+      val questionnaire =
+        Questionnaire().apply {
+          id = "a-questionnaire"
+          identifier = listOf(Identifier().apply { value = "Questionnaire A" })
+
+          addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "a-questionnaire-reason"
+              text = "Reason"
+              type = Questionnaire.QuestionnaireItemType.STRING
+              addExtension().apply {
+                url = EXTENSION_CALCULATED_EXPRESSION_URL
+                setValue(
+                  Expression().apply {
+                    this.language = "text/fhirpath"
+                    this.expression = "'Question = ' + %qItem.text"
+                  },
+                )
+              }
+            },
+          )
+        }
+
+      val expressionEvaluator = ExpressionEvaluator(questionnaire, QuestionnaireResponse())
+
+      val result =
+        expressionEvaluator.evaluateCalculatedExpressions(
+          questionnaire.item.elementAt(0),
+          null,
+        )
+
+      assertThat(result.first().second.first().asStringValue()).isEqualTo("Question = Reason")
+    }
+
+  @Test
   fun `detectExpressionCyclicDependency() should throw illegal argument exception when item with calculated expression have cyclic dependency`() {
     val questionnaire =
       Questionnaire().apply {
@@ -632,8 +785,8 @@ class ExpressionEvaluatorTest {
             type = Questionnaire.QuestionnaireItemType.DATE
             addInitial(
               Questionnaire.QuestionnaireItemInitialComponent(
-                DateType(Date()).apply { add(Calendar.YEAR, -2) }
-              )
+                DateType(Date()).apply { add(Calendar.YEAR, -2) },
+              ),
             )
             addExtension().apply {
               url = EXTENSION_CALCULATED_EXPRESSION_URL
@@ -642,10 +795,10 @@ class ExpressionEvaluatorTest {
                   this.language = "text/fhirpath"
                   this.expression =
                     "%resource.repeat(item).where(linkId='a-age-years' and answer.empty().not()).select(today() - answer.value)"
-                }
+                },
               )
             }
-          }
+          },
         )
 
         addItem(
@@ -659,10 +812,10 @@ class ExpressionEvaluatorTest {
                   this.language = "text/fhirpath"
                   this.expression =
                     "today().toString().substring(0, 4).toInteger() - %resource.repeat(item).where(linkId='a-birthdate').answer.value.toString().substring(0, 4).toInteger()"
-                }
+                },
               )
             }
-          }
+          },
         )
       }
 
@@ -869,8 +1022,8 @@ class ExpressionEvaluatorTest {
         questionnaireLaunchContextMap =
           mapOf(
             patient.resourceType.name.lowercase() to patient,
-            location.resourceType.name.lowercase() to location
-          )
+            location.resourceType.name.lowercase() to location,
+          ),
       )
 
     val expressionsToEvaluate =
@@ -898,7 +1051,7 @@ class ExpressionEvaluatorTest {
                   name = "A"
                   language = "text/fhirpath"
                   expression = "1"
-                }
+                },
               )
             }
             addExtension().apply {
@@ -908,7 +1061,7 @@ class ExpressionEvaluatorTest {
                   name = "B"
                   language = "text/fhirpath"
                   expression = "2"
-                }
+                },
               )
             }
             addItem(
@@ -922,12 +1075,12 @@ class ExpressionEvaluatorTest {
                     Expression().apply {
                       language = "application/x-fhir-query"
                       expression = "Patient?address-city={{%A}}&gender={{%B}}"
-                    }
+                    },
                   )
                 }
-              }
+              },
             )
-          }
+          },
         )
       }
 
@@ -965,7 +1118,7 @@ class ExpressionEvaluatorTest {
                   name = "A"
                   language = "text/fhirpath"
                   expression = "1"
-                }
+                },
               )
             }
             addExtension().apply {
@@ -975,7 +1128,7 @@ class ExpressionEvaluatorTest {
                   name = "B"
                   language = "text/fhirpath"
                   expression = "2"
-                }
+                },
               )
             }
             addItem(
@@ -989,12 +1142,12 @@ class ExpressionEvaluatorTest {
                     Expression().apply {
                       language = "application/x-fhir-query"
                       expression = "Patient?address-city={{%A}}&gender={{%B}}"
-                    }
+                    },
                   )
                 }
-              }
+              },
             )
-          }
+          },
         )
       }
 

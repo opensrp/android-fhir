@@ -20,6 +20,7 @@ import com.github.fge.jsonpatch.JsonPatch
 import com.google.android.fhir.NetworkConfiguration
 import com.google.android.fhir.sync.HttpAuthenticator
 import java.util.concurrent.TimeUnit
+import okhttp3.Cache
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -44,14 +45,14 @@ internal interface RetrofitHttpService : FhirHttpService {
   override suspend fun post(
     @Url path: String,
     @Body resource: Resource,
-    @HeaderMap headers: Map<String, String>
+    @HeaderMap headers: Map<String, String>,
   ): Resource
 
   @PUT
   override suspend fun put(
     @Url path: String,
     @Body resource: Resource,
-    @HeaderMap headers: Map<String, String>
+    @HeaderMap headers: Map<String, String>,
   ): Resource
 
   @PATCH
@@ -66,7 +67,7 @@ internal interface RetrofitHttpService : FhirHttpService {
 
   class Builder(
     private val baseUrl: String,
-    private val networkConfiguration: NetworkConfiguration
+    private val networkConfiguration: NetworkConfiguration,
   ) {
     private var authenticator: HttpAuthenticator? = null
     private var httpLoggingInterceptor: HttpLoggingInterceptor? = null
@@ -99,13 +100,14 @@ internal interface RetrofitHttpService : FhirHttpService {
                       .newBuilder()
                       .addHeader(
                         "Authorization",
-                        it.getAuthenticationMethod().getAuthorizationHeader()
+                        it.getAuthenticationMethod().getAuthorizationHeader(),
                       )
                       .build()
                   chain.proceed(request)
-                }
+                },
               )
             }
+            networkConfiguration.httpCache?.let { this.cache(Cache(it.cacheDir, it.maxSize)) }
           }
           .build()
       return Retrofit.Builder()

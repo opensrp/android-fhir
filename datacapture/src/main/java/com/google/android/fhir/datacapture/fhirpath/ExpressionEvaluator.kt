@@ -25,6 +25,7 @@ import com.google.android.fhir.datacapture.extensions.variableExpressions
 import org.hl7.fhir.exceptions.FHIRException
 import org.hl7.fhir.r4.model.Base
 import org.hl7.fhir.r4.model.Expression
+import org.hl7.fhir.r4.model.ExpressionNode
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.Questionnaire.QuestionnaireItemComponent
 import org.hl7.fhir.r4.model.QuestionnaireResponse
@@ -81,6 +82,20 @@ internal class ExpressionEvaluator(
    */
   private val xFhirQueryEnhancementRegex = Regex("\\{\\{(.*?)\\}\\}")
 
+  /**
+   * Variable %questionnaire corresponds to the Questionnaire resource into
+   * QuestionnaireResponse.questionnaire element.
+   * https://build.fhir.org/ig/HL7/sdc/expressions.html#fhirpath-supplements
+   */
+  private val questionnaireFhirPathSupplement = "questionnaire"
+
+  /**
+   * Variable %qitem refer to Questionnaire.item that corresponds to context
+   * QuestionnaireResponse.item. It is only valid for FHIRPath expressions defined within a
+   * Questionnaire item. https://build.fhir.org/ig/HL7/sdc/expressions.html#fhirpath-supplements
+   */
+  private val questionnaireItemFhirPathSupplement = "qItem"
+
   /** Detects if any item into list is referencing a dependent item in its calculated expression */
   internal fun detectExpressionCyclicDependency(items: List<QuestionnaireItemComponent>) {
     items
@@ -113,12 +128,11 @@ internal class ExpressionEvaluator(
     expression: Expression,
   ): List<Base> {
     val appContext = extractDependentVariables(expression, questionnaireItem)
-    return fhirPathEngine.evaluate(
-      /* appContext= */ appContext,
-      /* focusResource= */ questionnaireResponse,
-      /* rootResource= */ null,
-      /* base= */ questionnaireResponseItem,
-      /* path= */ expression.expression,
+    return evaluateToBase(
+      questionnaireResponse,
+      questionnaireResponseItem,
+      expression.expression,
+      appContext,
     )
   }
 
@@ -166,11 +180,10 @@ internal class ExpressionEvaluator(
    * expression being evaluated.
    *
    * @param expression the [Expression] Variable expression
-   * Questionnaire.QuestionnaireItemComponent>] of child to parent
+   *   Questionnaire.QuestionnaireItemComponent>] of child to parent
    * @param questionnaireItem the [Questionnaire.QuestionnaireItemComponent] where this expression
-   * is defined,
+   *   is defined,
    * @param variablesMap the [Map<String, Base>] of variables, the default value is empty map
-   *
    * @return [Base] the result of expression
    */
   internal fun evaluateQuestionnaireItemVariableExpression(
@@ -181,8 +194,10 @@ internal class ExpressionEvaluator(
     require(
       questionnaireItem.variableExpressions.any {
         it.name == expression.name && it.expression == expression.expression
-      }
-    ) { "The expression should come from the same questionnaire item" }
+      },
+    ) {
+      "The expression should come from the same questionnaire item"
+    }
     extractDependentVariables(
       expression,
       questionnaireItem,
@@ -202,9 +217,9 @@ internal class ExpressionEvaluator(
    * @param expression the [Expression] expression to find variables applicable
    * @param questionnaireItem the [Questionnaire.QuestionnaireItemComponent] where this expression
    * @param variablesMap the [Map<String, Base>] of variables, the default value is empty map is
-   * defined
+   *   defined
    */
-  internal fun extractDependentVariables(
+  private fun extractDependentVariables(
     expression: Expression,
     questionnaireItem: QuestionnaireItemComponent,
     variablesMap: MutableMap<String, Base?> = mutableMapOf(),
@@ -219,7 +234,10 @@ internal class ExpressionEvaluator(
         )
       }
     }
-    return variablesMap
+    return variablesMap.apply {
+      put(questionnaireFhirPathSupplement, questionnaire)
+      put(questionnaireItemFhirPathSupplement, questionnaireItem)
+    }
   }
 
   /**
@@ -234,7 +252,6 @@ internal class ExpressionEvaluator(
    *
    * @param expression the [Expression] Variable expression
    * @param variablesMap the [Map<String, Base>] of variables, the default value is empty map
-   *
    * @return [Base] the result of expression
    */
   internal fun evaluateQuestionnaireVariableExpression(
@@ -278,13 +295,16 @@ internal class ExpressionEvaluator(
 
     val fhirPathsEvaluatedPairs =
       questionnaireLaunchContextMap
+        ?.toMutableMap()
         .takeIf { !it.isNullOrEmpty() }
+        ?.also { it.put(questionnaireFhirPathSupplement, questionnaire) }
         ?.let { evaluateXFhirEnhancement(expression, it) }
         ?: emptySequence()
 
     return (fhirPathsEvaluatedPairs + variablesEvaluatedPairs).fold(expression.expression) {
       acc: String,
-      pair: Pair<String, String> ->
+      pair: Pair<String, String>,
+      ->
       acc.replace(pair.first, pair.second)
     }
   }
@@ -295,30 +315,23 @@ internal class ExpressionEvaluator(
    * and the second element is the evaluated string result from evaluating the resource passed in.
    *
    * @param expression x-fhir-query expression containing a FHIRpath, e.g.
-   * Practitioner?active=true&{{Practitioner.name.family}}
+   *   Practitioner?active=true&{{Practitioner.name.family}}
    * @param launchContextMap the launch context to evaluate the expression against
    */
   private fun evaluateXFhirEnhancement(
     expression: Expression,
-    launchContextMap: Map<String, Resource>
+    launchContextMap: Map<String, Resource>,
   ): Sequence<Pair<String, String>> =
     xFhirQueryEnhancementRegex
       .findAll(expression.expression)
       .map { it.groupValues }
       .map { (fhirPathWithParentheses, fhirPath) ->
-        // TODO(omarismail94): See if FHIRPathEngine.check() can be used to distinguish invalid
-        // expression vs an expression that is valid, but does not return one resource only.
-        val expressionNode = fhirPathEngine.parse(fhirPath)
-        val resourceType =
-          expressionNode.constant?.primitiveValue()?.substring(1)
-            ?: expressionNode.name?.lowercase()
+        val expressionNode = extractExpressionNode(fhirPath)
         val evaluatedResult =
-          fhirPathEngine.evaluateToString(
-            /* appInfo= */ launchContextMap,
-            /* focusResource= */ null,
-            /* rootResource= */ null,
-            /* base= */ launchContextMap[resourceType],
-            /* node= */ expressionNode,
+          evaluateToString(
+            expression = expressionNode,
+            data = launchContextMap[extractResourceType(expressionNode)],
+            contextMap = launchContextMap,
           )
 
         // If the result of evaluating the FHIRPath expressions is an invalid query, it returns
@@ -330,7 +343,7 @@ internal class ExpressionEvaluator(
           Timber.w(
             "$fhirPath evaluated to null. The expression is either invalid, or the " +
               "expression returned no, or more than one resource. The expression will be " +
-              "replaced with a blank string."
+              "replaced with a blank string.",
           )
         }
         fhirPathWithParentheses to evaluatedResult
@@ -349,7 +362,7 @@ internal class ExpressionEvaluator(
    *
    * @param variableName the [String] to match the variable in the ancestors
    * @param questionnaireItem the [Questionnaire.QuestionnaireItemComponent] from where we have to
-   * track hierarchy up in the ancestors
+   *   track hierarchy up in the ancestors
    * @param variablesMap the [Map<String, Base>] of variables
    */
   private fun findAndEvaluateVariable(
@@ -390,12 +403,12 @@ internal class ExpressionEvaluator(
    *
    * @param variableName the [String] to match the variable in the ancestors
    * @param questionnaireItem the [Questionnaire.QuestionnaireItemComponent] whose ancestors we
-   * visit
+   *   visit
    * @return [Pair] containing [Questionnaire.QuestionnaireItemComponent] and an [Expression]
    */
   private fun findVariableInAncestors(
     variableName: String,
-    questionnaireItem: QuestionnaireItemComponent
+    questionnaireItem: QuestionnaireItemComponent,
   ): Pair<QuestionnaireItemComponent, Expression>? {
     var parent = questionnaireItemParentMap[questionnaireItem]
     while (parent != null) {
@@ -412,7 +425,6 @@ internal class ExpressionEvaluator(
    *
    * @param expression the [Expression] the expression to evaluate
    * @param dependentVariables the [Map] of variable names to their values
-   *
    * @return [Base] the result of an expression
    */
   private fun evaluateVariable(
@@ -428,19 +440,27 @@ internal class ExpressionEvaluator(
         "Unsupported expression language, language should be text/fhirpath"
       }
 
-      fhirPathEngine
-        .evaluate(
-          /* appContext= */ dependentVariables,
-          /* focusResource= */ questionnaireResponse,
-          /* rootResource= */ null,
-          /* base= */ null,
-          /* path= */ expression.expression,
+      evaluateToBase(
+          questionnaireResponse = questionnaireResponse,
+          questionnaireResponseItem = null,
+          expression = expression.expression,
+          contextMap = dependentVariables,
         )
         .firstOrNull()
     } catch (exception: FHIRException) {
       Timber.w("Could not evaluate expression with FHIRPathEngine", exception)
       null
     }
+}
+
+/**
+ * Extract [ResourceType] string representation from constant or name property of given
+ * [ExpressionNode].
+ */
+private fun extractResourceType(expressionNode: ExpressionNode): String? {
+  // TODO(omarismail94): See if FHIRPathEngine.check() can be used to distinguish invalid
+  // expression vs an expression that is valid, but does not return one resource only.
+  return expressionNode.constant?.primitiveValue()?.substring(1) ?: expressionNode.name?.lowercase()
 }
 
 /** Pair of a [Questionnaire.QuestionnaireItemComponent] with its evaluated answers */

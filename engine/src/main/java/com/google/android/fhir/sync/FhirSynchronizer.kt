@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,14 @@
 
 package com.google.android.fhir.sync
 
-import android.content.Context
-import com.google.android.fhir.DatastoreUtil
 import com.google.android.fhir.FhirEngine
 import com.google.android.fhir.sync.download.DownloadState
 import com.google.android.fhir.sync.download.Downloader
 import com.google.android.fhir.sync.upload.LocalChangesFetchMode
-import com.google.android.fhir.sync.upload.UploadState
 import com.google.android.fhir.sync.upload.Uploader
 import java.time.OffsetDateTime
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.flow
 import org.hl7.fhir.r4.model.ResourceType
 
@@ -44,32 +42,27 @@ private sealed class SyncResult {
 
 data class ResourceSyncException(val resourceType: ResourceType, val exception: Exception)
 
+internal data class UploadConfiguration(
+  val uploader: Uploader,
+)
+
+internal class DownloadConfiguration(
+  val downloader: Downloader,
+  val conflictResolver: ConflictResolver,
+)
+
 /** Class that helps synchronize the data source and save it in the local database */
 internal class FhirSynchronizer(
-  context: Context,
   private val fhirEngine: FhirEngine,
-  private val uploader: Uploader,
-  private val downloader: Downloader,
-  private val conflictResolver: ConflictResolver,
+  private val uploadConfiguration: UploadConfiguration,
+  private val downloadConfiguration: DownloadConfiguration,
+  private val datastoreUtil: FhirDataStore,
 ) {
-  private var syncState: MutableSharedFlow<SyncJobStatus>? = null
-  private val datastoreUtil = DatastoreUtil(context)
 
-  private fun isSubscribed(): Boolean {
-    return syncState != null
-  }
+  private val _syncState = MutableSharedFlow<SyncJobStatus>()
+  val syncState: SharedFlow<SyncJobStatus> = _syncState
 
-  fun subscribe(flow: MutableSharedFlow<SyncJobStatus>) {
-    if (isSubscribed()) {
-      throw IllegalStateException("Already subscribed to a flow")
-    }
-
-    this.syncState = flow
-  }
-
-  private suspend fun setSyncState(state: SyncJobStatus) {
-    syncState?.emit(state)
-  }
+  private suspend fun setSyncState(state: SyncJobStatus) = _syncState.emit(state)
 
   private suspend fun setSyncState(result: SyncResult): SyncJobStatus {
     // todo: emit this properly instead of using datastore?
@@ -77,7 +70,7 @@ internal class FhirSynchronizer(
 
     val state =
       when (result) {
-        is SyncResult.Success -> SyncJobStatus.Finished()
+        is SyncResult.Success -> SyncJobStatus.Succeeded()
         is SyncResult.Error -> SyncJobStatus.Failed(result.exceptions)
       }
 
@@ -102,9 +95,9 @@ internal class FhirSynchronizer(
 
   private suspend fun download(): SyncResult {
     val exceptions = mutableListOf<ResourceSyncException>()
-    fhirEngine.syncDownload(conflictResolver) {
+    fhirEngine.syncDownload(downloadConfiguration.conflictResolver) {
       flow {
-        downloader.download().collect {
+        downloadConfiguration.downloader.download().collect {
           when (it) {
             is DownloadState.Started -> {
               setSyncState(SyncJobStatus.InProgress(SyncOperation.DOWNLOAD, it.total))
@@ -123,7 +116,6 @@ internal class FhirSynchronizer(
     return if (exceptions.isEmpty()) {
       SyncResult.Success()
     } else {
-      setSyncState(SyncJobStatus.Glitch(exceptions))
       SyncResult.Error(exceptions)
     }
   }
@@ -131,27 +123,21 @@ internal class FhirSynchronizer(
   private suspend fun upload(): SyncResult {
     val exceptions = mutableListOf<ResourceSyncException>()
     val localChangesFetchMode = LocalChangesFetchMode.AllChanges
-    fhirEngine.syncUpload(localChangesFetchMode) { list ->
-      flow {
-        uploader.upload(list).collect { result ->
-          when (result) {
-            is UploadState.Started ->
-              setSyncState(SyncJobStatus.InProgress(SyncOperation.UPLOAD, result.total))
-            is UploadState.Success ->
-              emit(result.localChangeToken to result.resource).also {
-                setSyncState(
-                  SyncJobStatus.InProgress(SyncOperation.UPLOAD, result.total, result.completed),
-                )
-              }
-            is UploadState.Failure -> exceptions.add(result.syncError)
-          }
-        }
-      }
+    fhirEngine.syncUpload(localChangesFetchMode, uploadConfiguration.uploader::upload).collect {
+      progress ->
+      progress.uploadError?.let { exceptions.add(it) }
+        ?: setSyncState(
+          SyncJobStatus.InProgress(
+            SyncOperation.UPLOAD,
+            progress.initialTotal,
+            progress.initialTotal - progress.remaining,
+          ),
+        )
     }
+
     return if (exceptions.isEmpty()) {
       SyncResult.Success()
     } else {
-      setSyncState(SyncJobStatus.Glitch(exceptions))
       SyncResult.Error(exceptions)
     }
   }

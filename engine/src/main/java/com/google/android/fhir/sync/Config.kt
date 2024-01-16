@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,8 @@ typealias ParamMap = Map<String, String>
 /** Constant for the Greater Than Search Prefix */
 @PublishedApi internal const val GREATER_THAN_PREFIX = "gt"
 
+@PublishedApi internal const val UNIQUE_WORK_NAME = "unique_work_name"
+
 val defaultRetryConfiguration =
   RetryConfiguration(BackoffCriteria(BackoffPolicy.LINEAR, 30, TimeUnit.SECONDS), 3)
 
@@ -48,7 +50,7 @@ object SyncDataParams {
 class PeriodicSyncConfiguration(
   /**
    * Constraints that specify the requirements needed before the synchronisation is triggered. E.g.
-   * network type (Wifi, 3G etc), the device should be charging etc.
+   * network type (WiFi, 3G etc), the device should be charging etc.
    */
   val syncConstraints: Constraints = Constraints.Builder().build(),
 

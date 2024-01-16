@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,9 @@
 package com.google.android.fhir.impl
 
 import android.content.Context
-import com.google.android.fhir.DatastoreUtil
 import com.google.android.fhir.FhirEngine
+import com.google.android.fhir.FhirEngineProvider
 import com.google.android.fhir.LocalChange
-import com.google.android.fhir.LocalChangeToken
 import com.google.android.fhir.SearchResult
 import com.google.android.fhir.db.Database
 import com.google.android.fhir.logicalId
@@ -32,8 +31,11 @@ import com.google.android.fhir.sync.Resolved
 import com.google.android.fhir.sync.upload.DefaultResourceConsolidator
 import com.google.android.fhir.sync.upload.LocalChangeFetcherFactory
 import com.google.android.fhir.sync.upload.LocalChangesFetchMode
+import com.google.android.fhir.sync.upload.SyncUploadProgress
+import com.google.android.fhir.sync.upload.UploadSyncResult
 import java.time.OffsetDateTime
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
 
@@ -65,7 +67,7 @@ internal class FhirEngineImpl(private val database: Database, private val contex
   }
 
   override suspend fun getLastSyncTimeStamp(): OffsetDateTime? {
-    return DatastoreUtil(context).readLastSyncTimestamp()
+    return FhirEngineProvider.getFhirDataStore(context).readLastSyncTimestamp()
   }
 
   override suspend fun clearDatabase() {
@@ -125,13 +127,37 @@ internal class FhirEngineImpl(private val database: Database, private val contex
 
   override suspend fun syncUpload(
     localChangesFetchMode: LocalChangesFetchMode,
-    upload: suspend (List<LocalChange>) -> Flow<Pair<LocalChangeToken, Resource>>,
-  ) {
+    upload: (suspend (List<LocalChange>) -> UploadSyncResult),
+  ): Flow<SyncUploadProgress> = flow {
     val resourceConsolidator = DefaultResourceConsolidator(database)
     val localChangeFetcher = LocalChangeFetcherFactory.byMode(localChangesFetchMode, database)
+
+    emit(
+      SyncUploadProgress(
+        remaining = localChangeFetcher.total,
+        initialTotal = localChangeFetcher.total,
+      ),
+    )
+
     while (localChangeFetcher.hasNext()) {
-      upload(localChangeFetcher.next()).collect {
-        resourceConsolidator.consolidate(it.first, it.second)
+      val localChanges = localChangeFetcher.next()
+      val uploadSyncResult = upload(localChanges)
+
+      resourceConsolidator.consolidate(uploadSyncResult)
+      when (uploadSyncResult) {
+        is UploadSyncResult.Success -> emit(localChangeFetcher.getProgress())
+        is UploadSyncResult.Failure -> {
+          with(localChangeFetcher.getProgress()) {
+            emit(
+              SyncUploadProgress(
+                remaining = remaining,
+                initialTotal = initialTotal,
+                uploadError = uploadSyncResult.syncError,
+              ),
+            )
+          }
+          break
+        }
       }
     }
   }

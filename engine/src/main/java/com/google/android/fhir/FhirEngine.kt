@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import com.google.android.fhir.db.ResourceNotFoundException
 import com.google.android.fhir.search.Search
 import com.google.android.fhir.sync.ConflictResolver
 import com.google.android.fhir.sync.upload.LocalChangesFetchMode
+import com.google.android.fhir.sync.upload.SyncUploadProgress
+import com.google.android.fhir.sync.upload.UploadSyncResult
 import java.time.OffsetDateTime
 import kotlinx.coroutines.flow.Flow
 import org.hl7.fhir.r4.model.Resource
@@ -49,14 +51,20 @@ interface FhirEngine {
   suspend fun <R : Resource> search(search: Search): List<SearchResult<R>>
 
   /**
-   * Synchronizes the [upload] result in the database. [upload] operation may result in multiple
-   * calls to the server to upload the data. Result of each call will be emitted by [upload] and the
-   * api caller should [Flow.collect] it.
+   * Synchronizes the upload results in the database.
+   *
+   * The [upload] function may initiate multiple server calls. Each call's result can then be used
+   * to emit [UploadSyncResult]. The caller should collect these results using [Flow.collect].
+   *
+   * @param localChangesFetchMode Specifies the mode to fetch local changes.
+   * @param upload A suspend function that takes a list of [LocalChange] and returns an
+   *   [UploadSyncResult].
+   * @return A [Flow] that emits the progress of the synchronization process.
    */
   suspend fun syncUpload(
     localChangesFetchMode: LocalChangesFetchMode,
-    upload: (suspend (List<LocalChange>) -> Flow<Pair<LocalChangeToken, Resource>>),
-  )
+    upload: (suspend (List<LocalChange>) -> UploadSyncResult),
+  ): Flow<SyncUploadProgress>
 
   /**
    * Synchronizes the [download] result in the database. The database will be updated to reflect the
@@ -145,42 +153,4 @@ data class SearchResult<R : Resource>(
   val included: Map<SearchParamName, List<Resource>>?,
   /** Matching referenced resources as per the [Search.revInclude] criteria in the query. */
   val revIncluded: Map<Pair<ResourceType, SearchParamName>, List<Resource>>?,
-) {
-  override fun equals(other: Any?) =
-    other is SearchResult<*> &&
-      equalsShallow(resource, other.resource) &&
-      equalsShallow(included, other.included) &&
-      equalsShallow(revIncluded, other.revIncluded)
-
-  private fun equalsShallow(first: Resource, second: Resource) =
-    first.resourceType == second.resourceType && first.logicalId == second.logicalId
-
-  private fun equalsShallow(first: List<Resource>, second: List<Resource>) =
-    first.size == second.size &&
-      first.asSequence().zip(second.asSequence()).all { (x, y) -> equalsShallow(x, y) }
-
-  private fun equalsShallow(
-    first: Map<SearchParamName, List<Resource>>?,
-    second: Map<SearchParamName, List<Resource>>?,
-  ) =
-    if (first != null && second != null && first.size == second.size) {
-      first.entries.asSequence().zip(second.entries.asSequence()).all { (x, y) ->
-        x.key == y.key && equalsShallow(x.value, y.value)
-      }
-    } else {
-      first?.size == second?.size
-    }
-
-  @JvmName("equalsShallowRevInclude")
-  private fun equalsShallow(
-    first: Map<Pair<ResourceType, SearchParamName>, List<Resource>>?,
-    second: Map<Pair<ResourceType, SearchParamName>, List<Resource>>?,
-  ) =
-    if (first != null && second != null && first.size == second.size) {
-      first.entries.asSequence().zip(second.entries.asSequence()).all { (x, y) ->
-        x.key == y.key && equalsShallow(x.value, y.value)
-      }
-    } else {
-      first?.size == second?.size
-    }
-}
+)

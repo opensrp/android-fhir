@@ -1,5 +1,3 @@
-import Dependencies.forceHapiVersion
-import Dependencies.forceJacksonVersion
 import Dependencies.removeIncompatibleDependencies
 import java.net.URL
 
@@ -65,7 +63,7 @@ android {
         "META-INF/sun-jaxb.episode",
         "META-INF/*.kotlin_module",
         "readme.html",
-      )
+      ),
     )
   }
   configureJacocoTestOptions()
@@ -75,13 +73,7 @@ android {
 
 afterEvaluate { configureFirebaseTestLabForLibraries() }
 
-configurations {
-  all {
-    removeIncompatibleDependencies()
-    forceHapiVersion()
-    forceJacksonVersion()
-  }
-}
+configurations { all { removeIncompatibleDependencies() } }
 
 dependencies {
   coreLibraryDesugaring(Dependencies.desugarJdkLibs)
@@ -98,43 +90,19 @@ dependencies {
   androidTestImplementation(project(":workflow-testing"))
 
   api(Dependencies.HapiFhir.structuresR4) { exclude(module = "junit") }
+  api(Dependencies.HapiFhir.guavaCaching)
 
   implementation(Dependencies.Androidx.coreKtx)
-
-  implementation(Dependencies.Cql.engine)
-  implementation(Dependencies.Cql.engineJackson) // Necessary to import Executable XML/JSON CQL libs
   implementation(Dependencies.Cql.evaluator)
-  implementation(Dependencies.Cql.evaluatorBuilder)
-  implementation(Dependencies.Cql.evaluatorDagger)
-  implementation(Dependencies.Cql.evaluatorPlanDef)
-  implementation(Dependencies.Cql.translatorCqlToElm) // Overrides HAPI's old versions
-  implementation(Dependencies.Cql.translatorElm) // Overrides HAPI's old versions
-  implementation(Dependencies.Cql.translatorElmJackson) // Necessary to import XML/JSON CQL Libs
-  implementation(Dependencies.Cql.translatorModel) // Overrides HAPI's old versions
-  implementation(Dependencies.Cql.translatorModelJackson) // Necessary to import XML/JSON ModelInfos
-  implementation(Dependencies.timber)
-
-  // Forces the most recent version of jackson, ignoring what dependencies use.
-  // Remove these lines when HAPI 6.4 becomes available.
-  implementation(Dependencies.Jackson.annotations)
-  implementation(Dependencies.Jackson.bom)
-  implementation(Dependencies.Jackson.core)
-  implementation(Dependencies.Jackson.databind)
-  implementation(Dependencies.Jackson.dataformatXml)
-  implementation(Dependencies.Jackson.jaxbAnnotations)
-  implementation(Dependencies.Jackson.jsr310)
-
-  // Runtime dependency that is required to run FhirPath (also requires minSDK of 26).
-  // Version 3.0 uses java.lang.System.Logger, which is not available on Android
-  // Replace for Guava when this PR gets merged: https://github.com/hapifhir/hapi-fhir/pull/3977
-  implementation(Dependencies.HapiFhir.caffeine)
-
+  implementation(Dependencies.Cql.evaluatorFhirJackson)
+  implementation(Dependencies.HapiFhir.guavaCaching)
   implementation(Dependencies.Kotlin.kotlinCoroutinesAndroid)
   implementation(Dependencies.Kotlin.kotlinCoroutinesCore)
   implementation(Dependencies.Kotlin.stdlib)
-  implementation(Dependencies.xerces)
   implementation(Dependencies.androidFhirEngine) { exclude(module = "truth") }
   implementation(Dependencies.androidFhirKnowledge)
+  implementation(Dependencies.timber)
+  implementation(Dependencies.xerces)
 
   testImplementation(Dependencies.AndroidxTest.core)
   testImplementation(Dependencies.jsonAssert)
@@ -142,7 +110,15 @@ dependencies {
   testImplementation(Dependencies.robolectric)
   testImplementation(Dependencies.truth)
   testImplementation(Dependencies.xmlUnit)
+  testImplementation(project(mapOf("path" to ":knowledge")))
   testImplementation(project(":workflow-testing"))
+
+  constraints {
+    Dependencies.hapiFhirConstraints().forEach { (libName, constraints) ->
+      api(libName, constraints)
+      implementation(libName, constraints)
+    }
+  }
 }
 
 tasks.dokkaHtml.configure {
@@ -156,14 +132,14 @@ tasks.dokkaHtml.configure {
       sourceLink {
         localDirectory.set(file("src/main/java"))
         remoteUrl.set(
-          URL("https://github.com/google/android-fhir/tree/master/workflow/src/main/java")
+          URL("https://github.com/google/android-fhir/tree/master/workflow/src/main/java"),
         )
         remoteLineSuffix.set("#L")
       }
       externalDocumentationLink {
         url.set(URL("https://hapifhir.io/hapi-fhir/apidocs/hapi-fhir-structures-r4/"))
         packageListUrl.set(
-          URL("https://hapifhir.io/hapi-fhir/apidocs/hapi-fhir-structures-r4/element-list")
+          URL("https://hapifhir.io/hapi-fhir/apidocs/hapi-fhir-structures-r4/element-list"),
         )
       }
       externalDocumentationLink {
