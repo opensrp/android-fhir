@@ -133,6 +133,7 @@ dependencies {
   implementation(Dependencies.sqlcipher)
   implementation(Dependencies.timber)
   implementation(Dependencies.truth)
+  implementation(kotlin("reflect"))
 
   kapt(Dependencies.Room.compiler)
 

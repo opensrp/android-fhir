@@ -41,9 +41,11 @@ internal class DownloaderImpl(
     var resourceTypeToDownload: ResourceType = ResourceType.Bundle
     // download count summary of all resources for progress i.e. <type, total, completed>
     val totalResourcesToDownloadCount = getProgressSummary().values.sumOf { it ?: 0 }
+    Timber.i("MeasureSyncTime: resource being downloaded: $resourceTypeToDownload")
     emit(DownloadState.Started(resourceTypeToDownload, totalResourcesToDownloadCount))
     var downloadedResourcesCount = 0
     var request = downloadWorkManager.getNextRequest()
+    Timber.i("MeasureSyncTime: nextRequest: $request")
     while (request != null) {
       try {
         resourceTypeToDownload = request.toResourceType()
@@ -56,6 +58,7 @@ internal class DownloaderImpl(
         emit(DownloadState.Failure(ResourceSyncException(resourceTypeToDownload, exception)))
       }
       request = downloadWorkManager.getNextRequest()
+      Timber.i("MeasureSyncTime: nextRequest: $request")
     }
   }
 

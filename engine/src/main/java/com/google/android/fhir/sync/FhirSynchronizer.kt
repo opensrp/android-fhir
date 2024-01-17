@@ -97,6 +97,7 @@ internal class FhirSynchronizer(
     val exceptions = mutableListOf<ResourceSyncException>()
     fhirEngine.syncDownload(downloadConfiguration.conflictResolver) {
       flow {
+        measureSyncTime("downloadConfiguration.downloader.download()") {
         downloadConfiguration.downloader.download().collect {
           when (it) {
             is DownloadState.Started -> {
@@ -111,6 +112,7 @@ internal class FhirSynchronizer(
             }
           }
         }
+        }
       }
     }
     return if (exceptions.isEmpty()) {
@@ -123,6 +125,7 @@ internal class FhirSynchronizer(
   private suspend fun upload(): SyncResult {
     val exceptions = mutableListOf<ResourceSyncException>()
     val localChangesFetchMode = LocalChangesFetchMode.AllChanges
+    measureSyncTime("fhirEngine.syncUpload()") {
     fhirEngine.syncUpload(localChangesFetchMode, uploadConfiguration.uploader::upload).collect {
       progress ->
       progress.uploadError?.let { exceptions.add(it) }
@@ -133,6 +136,7 @@ internal class FhirSynchronizer(
             progress.initialTotal - progress.remaining,
           ),
         )
+    }
     }
 
     return if (exceptions.isEmpty()) {
