@@ -65,7 +65,7 @@ internal object LocalChangeUtils {
       }
     }
     return LocalChangeEntity(
-      id = 0,
+      id = second.id,
       resourceId = second.resourceId,
       resourceType = second.resourceType,
       type = type,
@@ -171,7 +171,7 @@ internal fun SquashedLocalChange.toLocalChange(): LocalChange {
     localChange.timestamp,
     LocalChange.Type.from(localChange.type.value),
     localChange.payload,
-    token
+    token,
   )
 }
 

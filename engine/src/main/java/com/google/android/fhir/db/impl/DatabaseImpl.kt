@@ -214,7 +214,7 @@ internal class DatabaseImpl(
         SquashedLocalChange(
           LocalChangeToken(listOf(it.id)),
           LocalChangeEntity(
-            id = 0,
+            id = it.id,
             resourceId = it.resourceId,
             resourceType = it.resourceType,
             type = it.type,
