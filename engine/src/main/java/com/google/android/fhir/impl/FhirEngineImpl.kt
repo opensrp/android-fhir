@@ -49,7 +49,7 @@ internal class FhirEngineImpl(private val database: Database, private val contex
   override suspend fun create(vararg resource: Resource): List<String> {
     return database.insert(*resource)
   }
-  override suspend fun createRemote(vararg resource: Resource){
+  override suspend fun createRemote(vararg resource: Resource) {
     return database.insertRemote(*resource)
   }
 
@@ -198,11 +198,11 @@ internal class FhirEngineImpl(private val database: Database, private val contex
       .intersect(database.getAllLocalChanges().map { it.localChange.resourceId }.toSet())
 
   override suspend fun syncUpload(
-    upload: suspend (List<LocalChange>) -> Flow<Pair<LocalChangeToken, Resource>>
+    upload: suspend (List<SquashedLocalChange>) -> Flow<Pair<LocalChangeToken, Resource>>
   ) {
     val localChanges = database.getAllLocalChanges()
     if (localChanges.isNotEmpty()) {
-      upload(localChanges.map { it.toLocalChange() }).collect {
+      upload(localChanges).collect {
         database.deleteUpdates(it.first)
         when (it.second) {
           is Bundle -> updateVersionIdAndLastUpdated(it.second as Bundle)

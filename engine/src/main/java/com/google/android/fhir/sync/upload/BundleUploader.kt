@@ -16,8 +16,8 @@
 
 package com.google.android.fhir.sync.upload
 
-import com.google.android.fhir.LocalChange
 import com.google.android.fhir.db.impl.dao.LocalChangeToken
+import com.google.android.fhir.db.impl.dao.SquashedLocalChange
 import com.google.android.fhir.sync.DataSource
 import com.google.android.fhir.sync.Request
 import com.google.android.fhir.sync.ResourceSyncException
@@ -39,7 +39,7 @@ internal class BundleUploader(
   private val localChangesPaginator: LocalChangesPaginator
 ) : Uploader {
 
-  override suspend fun upload(localChanges: List<LocalChange>): Flow<UploadResult> = flow {
+  override suspend fun upload(localChanges: List<SquashedLocalChange>): Flow<UploadResult> = flow {
     val total = localChanges.size
     var completed = 0
 

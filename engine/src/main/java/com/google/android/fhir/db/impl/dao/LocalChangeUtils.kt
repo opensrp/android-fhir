@@ -174,3 +174,16 @@ internal fun SquashedLocalChange.toLocalChange(): LocalChange {
     token
   )
 }
+
+/** Method to convert internal SquashedLocalChange to LocalChangeEntity instance. */
+internal fun SquashedLocalChange.toLocalChangeEntity(): LocalChangeEntity {
+  return LocalChangeEntity(
+    resourceType = localChange.resourceType,
+    resourceId = localChange.resourceId,
+    versionId = localChange.versionId,
+    timestamp = localChange.timestamp,
+    type = Type.from(localChange.type.value),
+    payload = localChange.payload,
+    id = localChange.id
+  )
+}

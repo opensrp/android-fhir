@@ -17,11 +17,16 @@
 package com.google.android.fhir.sync.upload
 
 import com.google.android.fhir.LocalChange
+import com.google.android.fhir.db.impl.dao.LocalChangeToken
+import com.google.android.fhir.db.impl.dao.LocalChangeUtils
+import com.google.android.fhir.db.impl.dao.SquashedLocalChange
+import com.google.android.fhir.db.impl.dao.toLocalChange
+import com.google.android.fhir.db.impl.dao.toLocalChangeEntity
 import com.google.android.fhir.sync.UploadConfiguration
 
 /** Splits the [List]<[LocalChange]> into smaller chunks. */
 internal fun interface LocalChangesPaginator {
-  fun page(list: List<LocalChange>): List<List<LocalChange>>
+  fun page(list: List<SquashedLocalChange>): List<List<LocalChange>>
 
   companion object Factory {
 
@@ -42,5 +47,19 @@ internal fun interface LocalChangesPaginator {
  * fewer elements than the [size].
  */
 internal class SizeBasedLocalChangesPaginator(val size: Int) : LocalChangesPaginator {
-  override fun page(list: List<LocalChange>) = list.chunked(size)
+  override fun page(list: List<SquashedLocalChange>) =
+    list.chunked(size).map { squashedLocalChanges ->
+      squashedLocalChanges
+        .asSequence()
+        .map { it.toLocalChangeEntity() }
+        .groupBy { it.resourceId to it.resourceType }
+        .values
+        .map {
+          SquashedLocalChange(
+            LocalChangeToken(it.map { localChangeEntity -> localChangeEntity.id }),
+            LocalChangeUtils.squash(it)
+          )
+        }
+        .map { it.toLocalChange() }
+    }
 }

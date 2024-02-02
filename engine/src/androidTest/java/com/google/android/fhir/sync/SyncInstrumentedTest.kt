@@ -66,15 +66,14 @@ class SyncInstrumentedTest {
 
   @Test
   fun oneTime_worker_runs() = runTest {
-    val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-      Sync(workManager)
-        .oneTimeSync<TestSyncWorker>()
-        .transformWhile {
+    val job =
+      launch(UnconfinedTestDispatcher(testScheduler)) {
+        Sync(workManager).oneTimeSync<TestSyncWorker>().transformWhile {
           println(it is SyncJobStatus.Finished)
           emit(it is SyncJobStatus.Finished)
           it !is SyncJobStatus.Finished
         }
-    }
+      }
 
     job.join()
 

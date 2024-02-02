@@ -24,6 +24,7 @@ import com.google.android.fhir.FhirEngine
 import com.google.android.fhir.LocalChange
 import com.google.android.fhir.db.impl.dao.LocalChangeToken
 import com.google.android.fhir.db.impl.dao.SquashedLocalChange
+import com.google.android.fhir.db.impl.entities.LocalChangeEntity
 import com.google.android.fhir.search.Search
 import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.sync.BundleRequest
@@ -162,9 +163,24 @@ object TestFhirEngineImpl : FhirEngine {
   }
 
   override suspend fun syncUpload(
-    upload: suspend (List<LocalChange>) -> Flow<Pair<LocalChangeToken, Resource>>
+    upload: suspend (List<SquashedLocalChange>) -> Flow<Pair<LocalChangeToken, Resource>>
   ) {
-    upload(listOf(getLocalChange(ResourceType.Patient, "123")))
+    upload(
+      listOf(getLocalChange(ResourceType.Patient, "123")).mapIndexed { index, localChange ->
+        SquashedLocalChange(
+          LocalChangeToken(listOf()),
+          LocalChangeEntity(
+            resourceType = localChange.resourceType,
+            resourceId = localChange.resourceId,
+            versionId = localChange.versionId,
+            timestamp = localChange.timestamp,
+            type = LocalChangeEntity.Type.from(localChange.type.value),
+            payload = localChange.payload,
+            id = index.toLong()
+          )
+        )
+      }
+    )
   }
 
   override suspend fun syncDownload(

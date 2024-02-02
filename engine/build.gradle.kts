@@ -120,7 +120,6 @@ dependencies {
   androidTestImplementation(Dependencies.AndroidxTest.archCore)
   androidTestImplementation(Dependencies.Kotlin.kotlinCoroutinesTest)
 
-
   api(Dependencies.HapiFhir.structuresR4) { exclude(module = "junit") }
 
   coreLibraryDesugaring(Dependencies.desugarJdkLibs)
