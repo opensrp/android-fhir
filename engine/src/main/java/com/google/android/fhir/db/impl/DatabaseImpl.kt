@@ -76,13 +76,15 @@ internal class DatabaseImpl(
     db =
       // Initializes builder with the database file name
       when {
-          databaseConfig.inMemory ->
-            Room.inMemoryDatabaseBuilder(context, ResourceDatabase::class.java)
-          enableEncryption ->
-            Room.databaseBuilder(context, ResourceDatabase::class.java, ENCRYPTED_DATABASE_NAME)
-          else ->
-            Room.databaseBuilder(context, ResourceDatabase::class.java, UNENCRYPTED_DATABASE_NAME)
-        }
+        databaseConfig.inMemory ->
+          Room.inMemoryDatabaseBuilder(context, ResourceDatabase::class.java)
+
+        enableEncryption ->
+          Room.databaseBuilder(context, ResourceDatabase::class.java, ENCRYPTED_DATABASE_NAME)
+
+        else ->
+          Room.databaseBuilder(context, ResourceDatabase::class.java, UNENCRYPTED_DATABASE_NAME)
+      }
         .apply {
           // Provide the SupportSQLiteOpenHelper which enables the encryption.
           if (enableEncryption) {
@@ -212,10 +214,24 @@ internal class DatabaseImpl(
     return db.withTransaction {
       localChangeDao
         .getAllLocalChanges()
-        .groupBy { it.resourceId to it.resourceType }
-        .values.map {
-          SquashedLocalChange(LocalChangeToken(it.map { it.id }), LocalChangeUtils.squash(it))
+        .map {
+          SquashedLocalChange(
+            LocalChangeToken(listOf(it.id)), LocalChangeEntity(
+              id = 0,
+              resourceId = it.resourceId,
+              resourceType = it.resourceType,
+              type = it.type,
+              payload = it.payload,
+              versionId = it.versionId
+            )
+          )
         }
+      //TODO Disable group and squashing of resources, all the changes in LocalChange entity will
+      // be chunked into equal number of requests
+//        .groupBy { it.resourceId to it.resourceType }
+//        .values.map {
+//          SquashedLocalChange(LocalChangeToken(it.map { it.id }), LocalChangeUtils.squash(it))
+//        }
     }
   }
 
@@ -303,7 +319,8 @@ internal class DatabaseImpl(
      */
     const val ENCRYPTED_DATABASE_NAME = "resources_encrypted.db"
 
-    @VisibleForTesting const val DATABASE_PASSPHRASE_NAME = "fhirEngineDbPassphrase"
+    @VisibleForTesting
+    const val DATABASE_PASSPHRASE_NAME = "fhirEngineDbPassphrase"
   }
 }
 
