@@ -70,8 +70,8 @@ internal class Uploader(
         mappedUploadRequest is UrlUploadRequestMapping && response is DomainResource ->
           listOf(ResourceUploadResponseMapping(mappedUploadRequest.localChanges, response))
         mappedUploadRequest is BundleUploadRequestMapping &&
-          response is Bundle &&
-          response.type == Bundle.BundleType.TRANSACTIONRESPONSE ->
+                response is Bundle &&
+                response.type == Bundle.BundleType.TRANSACTIONRESPONSE ->
           handleBundleUploadResponse(mappedUploadRequest, response)
         else ->
           throw IllegalStateException(
@@ -116,7 +116,7 @@ internal class Uploader(
             ),
           )
         (response is DomainResource || response is Bundle) &&
-          (response !is IBaseOperationOutcome) ->
+                (response !is IBaseOperationOutcome) ->
           handleSuccessfulUploadResponse(mappedUploadRequest, response)
         else ->
           UploadRequestResult.Failure(
