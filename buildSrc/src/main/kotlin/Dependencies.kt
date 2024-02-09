@@ -117,6 +117,8 @@ object Dependencies {
     const val kotlinTestJunit = "org.jetbrains.kotlin:kotlin-test-junit:${Versions.Kotlin.stdlib}"
     const val kotlinCoroutinesTest =
       "org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.Kotlin.kotlinCoroutinesCore}"
+    const val kotlinCoroutinesPlay =
+      "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:${Versions.Kotlin.kotlinCoroutinesCore}"
     const val stdlib = "org.jetbrains.kotlin:kotlin-stdlib:${Versions.Kotlin.stdlib}"
   }
 
@@ -156,6 +158,8 @@ object Dependencies {
   }
 
   const val androidFhirGroup = "org.smartregister"
+  const val playServicesLocation =
+    "com.google.android.gms:play-services-location:${Versions.playServicesLocation}"
   const val androidFhirEngineModule = "engine"
   const val androidFhirKnowledgeModule = "knowledge"
   const val androidFhirCommon = "$androidFhirGroup:common:${Versions.androidFhirCommon}"
@@ -248,7 +252,7 @@ object Dependencies {
     }
 
     const val androidFhirCommon = "0.1.0-alpha05-preview2-SNAPSHOT"
-    const val androidFhirEngine = "1.0.0-preview1-SNAPSHOT"
+    const val androidFhirEngine = "1.0.0-preview2-SNAPSHOT"
     const val androidFhirKnowledge = "0.1.0-alpha03-preview2-SNAPSHOT"
     const val apacheCommonsCompress = "1.21"
     const val desugarJdkLibs = "2.0.3"
@@ -307,6 +311,8 @@ object Dependencies {
       const val objectDetection = "16.2.3"
       const val objectDetectionCustom = "16.3.1"
     }
+
+    const val playServicesLocation = "21.0.1"
   }
 
   fun Configuration.removeIncompatibleDependencies() {
