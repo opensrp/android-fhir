@@ -73,7 +73,7 @@ object Releases {
 
     object LocationWidget : LibraryArtifact {
       override val artifactId = "contrib-locationwidget"
-      override val version = "0.1.0-alpha01"
+      override val version = "0.1.0-alpha01-preview-SNAPSHOT"
       override val name =
         "Android FHIR Structured Data Capture - Location Widget Extensions (contrib)"
     }
