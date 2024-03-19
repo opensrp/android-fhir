@@ -48,7 +48,7 @@ object Releases {
 
   object Engine : LibraryArtifact {
     override val artifactId = "engine"
-    override val version = "1.0.0-preview3-SNAPSHOT"
+    override val version = "1.0.0-preview4-SNAPSHOT"
     override val name = "Android FHIR Engine Library"
   }
 
@@ -60,7 +60,7 @@ object Releases {
 
   object Workflow : LibraryArtifact {
     override val artifactId = "workflow"
-    override val version = "0.1.0-alpha04-preview7-SNAPSHOT"
+    override val version = "0.1.0-alpha04-preview8-SNAPSHOT"
     override val name = "Android FHIR Workflow Library"
   }
 
