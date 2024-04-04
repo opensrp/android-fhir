@@ -19,7 +19,9 @@ package com.google.android.fhir.sync.upload
 import com.google.android.fhir.LocalChange
 import com.google.android.fhir.LocalChange.Type
 import com.google.android.fhir.db.impl.dao.LocalChangeToken
+import java.util.LinkedList
 import org.hl7.fhir.r4.model.Bundle
+import org.hl7.fhir.r4.model.ResourceType
 
 typealias ResourceBundleAndAssociatedLocalChangeTokens = Pair<Bundle, List<LocalChangeToken>>
 
@@ -35,7 +37,23 @@ internal open class TransactionBundleGenerator(
   fun generate(
     localChanges: List<List<LocalChange>>
   ): List<ResourceBundleAndAssociatedLocalChangeTokens> {
-    return localChanges.filter { it.isNotEmpty() }.map { generateBundle(it) }
+    val patientResourceBundleList = LinkedList<ResourceBundleAndAssociatedLocalChangeTokens>()
+    val otherResourcesBundleList = LinkedList<ResourceBundleAndAssociatedLocalChangeTokens>()
+    localChanges.forEach { localChangeList ->
+      if (localChangeList.isNotEmpty()) {
+        val (patientResourceBundle, otherResourcesBundle: List<LocalChange>) =
+          localChangeList.partition {
+            ResourceType.valueOf(it.resourceType) == ResourceType.Patient && it.type == Type.INSERT
+          }
+        if (patientResourceBundle.isNotEmpty()) {
+          patientResourceBundleList.add(generateBundle(patientResourceBundle))
+        }
+        if (otherResourcesBundle.isNotEmpty()) {
+          otherResourcesBundleList.add(generateBundle(otherResourcesBundle))
+        }
+      }
+    }
+    return patientResourceBundleList.plus(otherResourcesBundleList)
   }
 
   private fun generateBundle(
