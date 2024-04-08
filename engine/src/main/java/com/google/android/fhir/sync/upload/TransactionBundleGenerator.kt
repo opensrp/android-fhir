@@ -38,22 +38,31 @@ internal open class TransactionBundleGenerator(
     localChanges: List<List<LocalChange>>
   ): List<ResourceBundleAndAssociatedLocalChangeTokens> {
     val patientResourceBundleList = LinkedList<ResourceBundleAndAssociatedLocalChangeTokens>()
+    val relatedPersonResourceBundleList = LinkedList<ResourceBundleAndAssociatedLocalChangeTokens>()
     val otherResourcesBundleList = LinkedList<ResourceBundleAndAssociatedLocalChangeTokens>()
     localChanges.forEach { localChangeList ->
       if (localChangeList.isNotEmpty()) {
-        val (patientResourceBundle, otherResourcesBundle: List<LocalChange>) =
+        val (priorityResourceBundle, otherResourcesBundle: List<LocalChange>) =
           localChangeList.partition {
-            ResourceType.valueOf(it.resourceType) == ResourceType.Patient && it.type == Type.INSERT
+            ResourceType.valueOf(it.resourceType) in
+              listOf(ResourceType.Patient, ResourceType.RelatedPerson) && it.type == Type.INSERT
           }
-        if (patientResourceBundle.isNotEmpty()) {
-          patientResourceBundleList.add(generateBundle(patientResourceBundle))
+        if (priorityResourceBundle.isNotEmpty()) {
+          priorityResourceBundle
+            .filter { ResourceType.valueOf(it.resourceType) == ResourceType.Patient }
+            .let { patientResourceBundleList.add(generateBundle(it)) }
+          priorityResourceBundle
+            .filter { ResourceType.valueOf(it.resourceType) == ResourceType.RelatedPerson }
+            .let { relatedPersonResourceBundleList.add(generateBundle(it)) }
         }
         if (otherResourcesBundle.isNotEmpty()) {
           otherResourcesBundleList.add(generateBundle(otherResourcesBundle))
         }
       }
     }
-    return patientResourceBundleList.plus(otherResourcesBundleList)
+    return patientResourceBundleList
+      .plus(relatedPersonResourceBundleList)
+      .plus(otherResourcesBundleList)
   }
 
   private fun generateBundle(
