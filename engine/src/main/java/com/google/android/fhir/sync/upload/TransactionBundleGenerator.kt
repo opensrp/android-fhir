@@ -19,9 +19,7 @@ package com.google.android.fhir.sync.upload
 import com.google.android.fhir.LocalChange
 import com.google.android.fhir.LocalChange.Type
 import com.google.android.fhir.db.impl.dao.LocalChangeToken
-import java.util.LinkedList
 import org.hl7.fhir.r4.model.Bundle
-import org.hl7.fhir.r4.model.ResourceType
 
 typealias ResourceBundleAndAssociatedLocalChangeTokens = Pair<Bundle, List<LocalChangeToken>>
 
@@ -37,32 +35,7 @@ internal open class TransactionBundleGenerator(
   fun generate(
     localChanges: List<List<LocalChange>>
   ): List<ResourceBundleAndAssociatedLocalChangeTokens> {
-    val patientResourceBundleList = LinkedList<ResourceBundleAndAssociatedLocalChangeTokens>()
-    val relatedPersonResourceBundleList = LinkedList<ResourceBundleAndAssociatedLocalChangeTokens>()
-    val otherResourcesBundleList = LinkedList<ResourceBundleAndAssociatedLocalChangeTokens>()
-    localChanges.forEach { localChangeList ->
-      if (localChangeList.isNotEmpty()) {
-        val (priorityResourceBundle, otherResourcesBundle: List<LocalChange>) =
-          localChangeList.partition {
-            ResourceType.valueOf(it.resourceType) in
-              listOf(ResourceType.Patient, ResourceType.RelatedPerson) && it.type == Type.INSERT
-          }
-        if (priorityResourceBundle.isNotEmpty()) {
-          priorityResourceBundle
-            .filter { ResourceType.valueOf(it.resourceType) == ResourceType.Patient }
-            .let { patientResourceBundleList.add(generateBundle(it)) }
-          priorityResourceBundle
-            .filter { ResourceType.valueOf(it.resourceType) == ResourceType.RelatedPerson }
-            .let { relatedPersonResourceBundleList.add(generateBundle(it)) }
-        }
-        if (otherResourcesBundle.isNotEmpty()) {
-          otherResourcesBundleList.add(generateBundle(otherResourcesBundle))
-        }
-      }
-    }
-    return patientResourceBundleList
-      .plus(relatedPersonResourceBundleList)
-      .plus(otherResourcesBundleList)
+    return localChanges.filter { it.isNotEmpty() }.map { generateBundle(it) }
   }
 
   private fun generateBundle(

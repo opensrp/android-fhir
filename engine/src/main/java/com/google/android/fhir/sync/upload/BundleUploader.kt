@@ -18,11 +18,13 @@ package com.google.android.fhir.sync.upload
 
 import com.google.android.fhir.db.impl.dao.LocalChangeToken
 import com.google.android.fhir.db.impl.dao.SquashedLocalChange
+import com.google.android.fhir.db.impl.entities.LocalChangeEntity
 import com.google.android.fhir.sync.DataSource
 import com.google.android.fhir.sync.Request
 import com.google.android.fhir.sync.ResourceSyncException
 import com.google.android.fhir.sync.UploadResult
 import com.google.android.fhir.sync.Uploader
+import java.util.LinkedList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import org.hl7.fhir.exceptions.FHIRException
@@ -42,10 +44,33 @@ internal class BundleUploader(
   override suspend fun upload(localChanges: List<SquashedLocalChange>): Flow<UploadResult> = flow {
     val total = localChanges.size
     var completed = 0
+    val patientResourceLocalChanges = LinkedList<SquashedLocalChange>()
+    val relatedPersonResourceLocalChanges = LinkedList<SquashedLocalChange>()
+
+    val (priorityLocalChanges, otherLocalChanges) =
+      localChanges.partition {
+        ResourceType.valueOf(it.localChange.resourceType) in
+          listOf(ResourceType.Patient, ResourceType.RelatedPerson) &&
+          it.localChange.type == LocalChangeEntity.Type.INSERT
+      }
+
+    if (priorityLocalChanges.isNotEmpty()) {
+      priorityLocalChanges.forEach {
+        if (ResourceType.valueOf(it.localChange.resourceType) == ResourceType.Patient) {
+          patientResourceLocalChanges.add(it)
+        }
+        if (ResourceType.valueOf(it.localChange.resourceType) == ResourceType.RelatedPerson) {
+          relatedPersonResourceLocalChanges.add(it)
+        }
+      }
+    }
+
+    val prioritizedLocalChanges =
+      patientResourceLocalChanges.plus(relatedPersonResourceLocalChanges).plus(otherLocalChanges)
 
     emit(UploadResult.Started(total))
 
-    bundleGenerator.generate(localChangesPaginator.page(localChanges)).forEach {
+    bundleGenerator.generate(localChangesPaginator.page(prioritizedLocalChanges)).forEach {
       (bundle, localChangeTokens) ->
       try {
         val response = dataSource.upload(Request.of(bundle))
