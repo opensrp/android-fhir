@@ -139,7 +139,8 @@ internal object LocalChangeUtils {
         (0 until length())
           .map { optJSONObject(it) }
           .filterNot { jsonObject ->
-            ignorePaths.any { jsonObject.optString("path").startsWith(it) }
+            ignorePaths.any { jsonObject.optString("path").startsWith(it) } ||
+              jsonObject.optString("path").contains("/contained/[0-9]/text")
           }
       )
     }
