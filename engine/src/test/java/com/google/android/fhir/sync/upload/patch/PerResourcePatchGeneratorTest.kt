@@ -20,7 +20,6 @@ import ca.uhn.fhir.context.FhirContext
 import ca.uhn.fhir.context.FhirVersionEnum
 import com.google.android.fhir.LocalChange
 import com.google.android.fhir.LocalChangeToken
-import com.google.android.fhir.db.Database
 import com.google.android.fhir.db.impl.dao.diff
 import com.google.android.fhir.db.impl.entities.LocalChangeEntity
 import com.google.android.fhir.logicalId
@@ -34,42 +33,26 @@ import com.google.common.truth.Truth.assertThat
 import java.time.Instant
 import java.util.Date
 import java.util.UUID
-import kotlin.test.assertFailsWith
-import kotlinx.coroutines.test.runTest
 import org.hl7.fhir.r4.model.HumanName
 import org.hl7.fhir.r4.model.Meta
 import org.hl7.fhir.r4.model.Patient
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
 import org.json.JSONArray
-import org.junit.Before
+import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mock
-import org.mockito.MockitoAnnotations
-import org.mockito.kotlin.any
-import org.mockito.kotlin.whenever
 import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class PerResourcePatchGeneratorTest {
 
-  @Mock private lateinit var database: Database
-  private lateinit var patchGenerator: PerResourcePatchGenerator
-
-  @Before
-  fun setUp() {
-    MockitoAnnotations.openMocks(this)
-    runTest { whenever(database.getLocalChangeResourceReferences(any())).thenReturn(emptyList()) }
-    patchGenerator = PerResourcePatchGenerator.with(database)
-  }
-
   @Test
-  fun `should generate a single insert patch if the resource is inserted`() = runTest {
+  fun `should generate a single insert patch if the resource is inserted`() {
     val patient: Patient = readFromFile(Patient::class.java, "/date_test_patient.json")
     val insertionLocalChange = createInsertLocalChange(patient)
 
-    val patches = patchGenerator.generate(listOf(insertionLocalChange))
+    val patches = PerResourcePatchGenerator.generate(listOf(insertionLocalChange))
 
     with(patches.single()) {
       with(generatedPatch) {
@@ -87,7 +70,7 @@ class PerResourcePatchGeneratorTest {
   }
 
   @Test
-  fun `should generate a single update patch if the resource is updated`() = runTest {
+  fun `should generate a single update patch if the resource is updated`() {
     val remoteMeta =
       Meta().apply {
         versionId = "patient-version-1"
@@ -100,7 +83,7 @@ class PerResourcePatchGeneratorTest {
     val updateLocalChange1 = createUpdateLocalChange(remotePatient, updatedPatient1, 1L)
     val updatePatch = readJsonArrayFromFile("/update_patch_1.json")
 
-    val patches = patchGenerator.generate(listOf(updateLocalChange1))
+    val patches = PerResourcePatchGenerator.generate(listOf(updateLocalChange1))
 
     with(patches.single()) {
       with(generatedPatch) {
@@ -119,7 +102,7 @@ class PerResourcePatchGeneratorTest {
   }
 
   @Test
-  fun `should generate a single delete patch if the resource is deleted`() = runTest {
+  fun `should generate a single delete patch if the resource is deleted`() {
     val remoteMeta =
       Meta().apply {
         versionId = "patient-version-1"
@@ -129,7 +112,7 @@ class PerResourcePatchGeneratorTest {
     remotePatient.meta = remoteMeta
     val deleteLocalChange = createDeleteLocalChange(remotePatient, 3L)
 
-    val patches = patchGenerator.generate(listOf(deleteLocalChange))
+    val patches = PerResourcePatchGenerator.generate(listOf(deleteLocalChange))
 
     with(patches.single()) {
       with(generatedPatch) {
@@ -148,14 +131,15 @@ class PerResourcePatchGeneratorTest {
   }
 
   @Test
-  fun `should generate a single insert patch if the resource is inserted and updated`() = runTest {
+  fun `should generate a single insert patch if the resource is inserted and updated`() {
     val patient: Patient = readFromFile(Patient::class.java, "/date_test_patient.json")
     val insertionLocalChange = createInsertLocalChange(patient)
     val updatedPatient = readFromFile(Patient::class.java, "/update_test_patient_1.json")
     val updateLocalChange = createUpdateLocalChange(patient, updatedPatient, 1L)
     val patientString = jsonParser.encodeResourceToString(updatedPatient)
 
-    val patches = patchGenerator.generate(listOf(insertionLocalChange, updateLocalChange))
+    val patches =
+      PerResourcePatchGenerator.generate(listOf(insertionLocalChange, updateLocalChange))
 
     with(patches.single()) {
       with(generatedPatch) {
@@ -173,7 +157,7 @@ class PerResourcePatchGeneratorTest {
   }
 
   @Test
-  fun `should generate no patch if the resource is inserted and deleted`() = runTest {
+  fun `should generate no patch if the resource is inserted and deleted`() {
     val changes =
       listOf(
         LocalChangeEntity(
@@ -212,13 +196,13 @@ class PerResourcePatchGeneratorTest {
           .toLocalChange()
           .apply { LocalChangeToken(listOf(2)) },
       )
-    val patchToUpload = patchGenerator.generate(changes)
+    val patchToUpload = PerResourcePatchGenerator.generate(changes)
 
     assertThat(patchToUpload).isEmpty()
   }
 
   @Test
-  fun `should generate no patch if the resource is inserted, updated, and deleted`() = runTest {
+  fun `should generate no patch if the resource is inserted, updated, and deleted`() {
     val changes =
       listOf(
         LocalChangeEntity(
@@ -290,13 +274,13 @@ class PerResourcePatchGeneratorTest {
           .toLocalChange()
           .apply { LocalChangeToken(listOf(3)) },
       )
-    val patchToUpload = patchGenerator.generate(changes)
+    val patchToUpload = PerResourcePatchGenerator.generate(changes)
 
     assertThat(patchToUpload).isEmpty()
   }
 
   @Test
-  fun `should generate a single update patch if the resource is updated twice`() = runTest {
+  fun `should generate a single update patch if the resource is updated twice`() {
     val remoteMeta =
       Meta().apply {
         versionId = "patient-version-1"
@@ -312,7 +296,7 @@ class PerResourcePatchGeneratorTest {
     val updateLocalChange2 = createUpdateLocalChange(updatedPatient1, updatedPatient2, 2L)
     val updatePatch = readJsonArrayFromFile("/update_patch_2.json")
 
-    val patches = patchGenerator.generate(listOf(updateLocalChange1, updateLocalChange2))
+    val patches = PerResourcePatchGenerator.generate(listOf(updateLocalChange1, updateLocalChange2))
 
     with(patches.single()) {
       with(generatedPatch) {
@@ -331,44 +315,44 @@ class PerResourcePatchGeneratorTest {
   }
 
   @Test
-  fun `should generate a single update patch with three elements of two adds and one remove`() =
-    runTest {
-      val expectedPatch = readJsonArrayFromFile("/update_careplan_patch.json")
-      val updatePatch1 = readJsonArrayFromFile("/update_careplan_patch_1.json")
-      val updatePatch2 = readJsonArrayFromFile("/update_careplan_patch_2.json")
+  fun `should generate a single update patch with three elements of two adds and one remove`() {
+    val expectedPatch = readJsonArrayFromFile("/update_careplan_patch.json")
+    val updatePatch1 = readJsonArrayFromFile("/update_careplan_patch_1.json")
+    val updatePatch2 = readJsonArrayFromFile("/update_careplan_patch_2.json")
 
-      val updatedLocalChange1 =
-        LocalChange(
-          resourceType = "CarePlan",
-          resourceId = "131b5257-a8b3-435a-8cb3-4cb1296be24a",
-          type = LocalChange.Type.UPDATE,
-          payload = updatePatch1.toString(),
-          timestamp = Instant.now(),
-          token = LocalChangeToken(listOf(1)),
-        )
+    val updatedLocalChange1 =
+      LocalChange(
+        resourceType = "CarePlan",
+        resourceId = "131b5257-a8b3-435a-8cb3-4cb1296be24a",
+        type = LocalChange.Type.UPDATE,
+        payload = updatePatch1.toString(),
+        timestamp = Instant.now(),
+        token = LocalChangeToken(listOf(1)),
+      )
 
-      val updatedLocalChange2 =
-        LocalChange(
-          resourceType = "CarePlan",
-          resourceId = "131b5257-a8b3-435a-8cb3-4cb1296be24a",
-          type = LocalChange.Type.UPDATE,
-          payload = updatePatch2.toString(),
-          timestamp = Instant.now(),
-          token = LocalChangeToken(listOf(1)),
-        )
+    val updatedLocalChange2 =
+      LocalChange(
+        resourceType = "CarePlan",
+        resourceId = "131b5257-a8b3-435a-8cb3-4cb1296be24a",
+        type = LocalChange.Type.UPDATE,
+        payload = updatePatch2.toString(),
+        timestamp = Instant.now(),
+        token = LocalChangeToken(listOf(1)),
+      )
 
-      val patches = patchGenerator.generate(listOf(updatedLocalChange1, updatedLocalChange2))
+    val patches =
+      PerResourcePatchGenerator.generate(listOf(updatedLocalChange1, updatedLocalChange2))
 
-      with(patches.single().generatedPatch) {
-        assertThat(type).isEqualTo(Patch.Type.UPDATE)
-        assertThat(resourceId).isEqualTo("131b5257-a8b3-435a-8cb3-4cb1296be24a")
-        assertThat(resourceType).isEqualTo("CarePlan")
-        assertJsonArrayEqualsIgnoringOrder(JSONArray(payload), expectedPatch)
-      }
+    with(patches.single().generatedPatch) {
+      assertThat(type).isEqualTo(Patch.Type.UPDATE)
+      assertThat(resourceId).isEqualTo("131b5257-a8b3-435a-8cb3-4cb1296be24a")
+      assertThat(resourceType).isEqualTo("CarePlan")
+      assertJsonArrayEqualsIgnoringOrder(JSONArray(payload), expectedPatch)
     }
+  }
 
   @Test
-  fun `should generate a single delete patch if the resource is updated and deleted`() = runTest {
+  fun `should generate a single delete patch if the resource is updated and deleted`() {
     val remoteMeta =
       Meta().apply {
         versionId = "patient-version-1"
@@ -385,7 +369,7 @@ class PerResourcePatchGeneratorTest {
     val deleteLocalChange = createDeleteLocalChange(updatedPatient2, 3L)
 
     val patches =
-      patchGenerator.generate(
+      PerResourcePatchGenerator.generate(
         listOf(updateLocalChange1, updateLocalChange2, deleteLocalChange),
       )
 
@@ -406,7 +390,7 @@ class PerResourcePatchGeneratorTest {
   }
 
   @Test
-  fun `should throw an error if a change is done after a resource is deleted locally`() = runTest {
+  fun `should throw an error if a change is done after a resource is deleted locally`() {
     val changes =
       listOf(
         LocalChangeEntity(
@@ -434,14 +418,16 @@ class PerResourcePatchGeneratorTest {
       )
 
     val errorMessage =
-      assertFailsWith<IllegalArgumentException> { patchGenerator.generate(changes) }
+      Assert.assertThrows(IllegalArgumentException::class.java) {
+          PerResourcePatchGenerator.generate(changes)
+        }
         .localizedMessage
 
     assertThat(errorMessage).isEqualTo("Changes after deletion of resource are not permitted")
   }
 
   @Test
-  fun `should throw an error if a change is done before a resource is created locally`() = runTest {
+  fun `should throw an error if a change is done before a resource is created locally`() {
     val changes =
       listOf(
         LocalChangeEntity(
@@ -480,8 +466,11 @@ class PerResourcePatchGeneratorTest {
           .toLocalChange()
           .apply { LocalChangeToken(listOf(2)) },
       )
+
     val errorMessage =
-      assertFailsWith<IllegalArgumentException> { patchGenerator.generate(changes) }
+      Assert.assertThrows(IllegalArgumentException::class.java) {
+          PerResourcePatchGenerator.generate(changes)
+        }
         .localizedMessage
 
     assertThat(errorMessage).isEqualTo("Changes before creation of resource are not permitted")
@@ -504,14 +493,14 @@ class PerResourcePatchGeneratorTest {
     )
   }
 
-  private fun createInsertLocalChange(entity: Resource, currentChangeId: Long = 1): LocalChange {
+  private fun createInsertLocalChange(entity: Resource): LocalChange {
     return LocalChange(
       resourceId = entity.logicalId,
       resourceType = entity.resourceType.name,
       type = LocalChange.Type.INSERT,
       payload = jsonParser.encodeResourceToString(entity),
       versionId = entity.versionId,
-      token = LocalChangeToken(listOf(currentChangeId)),
+      token = LocalChangeToken(listOf(1L)),
       timestamp = Instant.now(),
     )
   }
