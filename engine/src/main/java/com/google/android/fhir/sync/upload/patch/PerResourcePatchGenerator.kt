@@ -118,7 +118,7 @@ internal object PerResourcePatchGenerator : PatchGenerator {
     val objectMapper = ObjectMapper()
     val firstPatchNode: JsonNode = JsonLoader.fromString(firstPatch)
     val secondPatchNode: JsonNode = JsonLoader.fromString(secondPatch)
-    val mergedOperations = hashMapOf<String, MutableList<JsonNode>>()
+    val mergedOperations = linkedMapOf<String, MutableList<JsonNode>>()
 
     firstPatchNode.forEach { patchNode ->
       val path = patchNode.get("path").asText()
