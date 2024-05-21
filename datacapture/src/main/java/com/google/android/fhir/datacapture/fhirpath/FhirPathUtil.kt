@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2023 Google LLC
+ * Copyright 2022-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import ca.uhn.fhir.context.FhirContext
 import ca.uhn.fhir.context.FhirVersionEnum
 import org.hl7.fhir.r4.hapi.ctx.HapiWorkerContext
 import org.hl7.fhir.r4.model.Base
+import org.hl7.fhir.r4.model.ExpressionNode
 import org.hl7.fhir.r4.model.QuestionnaireResponse
 import org.hl7.fhir.r4.model.QuestionnaireResponse.QuestionnaireResponseItemComponent
 import org.hl7.fhir.r4.model.Resource
@@ -38,6 +39,20 @@ internal val fhirPathEngine: FHIRPathEngine =
 internal fun evaluateToDisplay(expressions: List<String>, data: Resource) =
   expressions.joinToString(" ") { fhirPathEngine.evaluateToString(data, it) }
 
+/** Evaluates the expression over resource [Resource] and returns string value */
+internal fun evaluateToString(
+  expression: ExpressionNode,
+  data: Resource?,
+  contextMap: Map<String, Base?>,
+) =
+  fhirPathEngine.evaluateToString(
+    /* appInfo = */ contextMap,
+    /* focusResource = */ null,
+    /* rootResource = */ null,
+    /* base = */ data,
+    /* node = */ expression,
+  )
+
 /**
  * Evaluates the expression and returns the boolean result. The resources [QuestionnaireResponse]
  * and [QuestionnaireResponseItemComponent] are passed as fhirPath supplements as defined in fhir
@@ -49,7 +64,7 @@ internal fun evaluateToBoolean(
   questionnaireResponse: QuestionnaireResponse,
   questionnaireResponseItemComponent: QuestionnaireResponseItemComponent,
   expression: String,
-  contextMap: Map<String, Base?>
+  contextMap: Map<String, Base?> = mapOf(),
 ): Boolean {
   val expressionNode = fhirPathEngine.parse(expression)
   return fhirPathEngine.evaluateToBoolean(
@@ -57,18 +72,43 @@ internal fun evaluateToBoolean(
     questionnaireResponse,
     null,
     questionnaireResponseItemComponent,
-    expressionNode
+    expressionNode,
   )
 }
 
-internal fun evaluateToBoolean(
-  questionnaireResponse: QuestionnaireResponse,
-  questionnaireResponseItemComponent: QuestionnaireResponseItemComponent,
-  expression: String
-) =
-  fhirPathEngine.evaluateToBoolean(
-    questionnaireResponse,
-    null,
-    questionnaireResponseItemComponent,
-    expression
+/**
+ * Evaluates the expression and returns the list of [Base]. The resources [QuestionnaireResponse]
+ * and [QuestionnaireResponseItemComponent] are passed as fhirPath supplements as defined in fhir
+ * specs https://build.fhir.org/ig/HL7/sdc/expressions.html#fhirpath-supplements. All other
+ * constants are passed as contextMap
+ *
+ * %resource = [QuestionnaireResponse], %context = [QuestionnaireResponseItemComponent]
+ */
+internal fun evaluateToBase(
+  questionnaireResponse: QuestionnaireResponse?,
+  questionnaireResponseItem: QuestionnaireResponseItemComponent?,
+  expression: String,
+  contextMap: Map<String, Base?> = mapOf(),
+): List<Base> {
+  return fhirPathEngine.evaluate(
+    /* appContext = */ contextMap,
+    /* focusResource = */ questionnaireResponse,
+    /* rootResource = */ null,
+    /* base = */ questionnaireResponseItem,
+    /* path = */ expression,
   )
+}
+
+/** Evaluates the given expression and returns list of [Base] */
+internal fun evaluateToBase(base: Base, expression: String): List<Base> {
+  return fhirPathEngine.evaluate(
+    /* base = */ base,
+    /* path = */ expression,
+  )
+}
+
+/** Evaluates the given list of [Base] elements and returns boolean result */
+internal fun convertToBoolean(items: List<Base>) = fhirPathEngine.convertToBoolean(items)
+
+/** Parse the given expression into [ExpressionNode] */
+internal fun extractExpressionNode(fhirPath: String) = fhirPathEngine.parse(fhirPath)

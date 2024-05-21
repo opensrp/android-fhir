@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.Calendar
 import java.util.Date
+import kotlinx.coroutines.runBlocking
 import org.hamcrest.CoreMatchers
 import org.hl7.fhir.r4.model.DateTimeType
 import org.hl7.fhir.r4.model.DateType
@@ -289,12 +290,15 @@ class QuestionnaireUiEspressoTest {
     val answer = getQuestionnaireResponse().item.first().answer.first().valueDateType.valueAsString
 
     assertThat(answer).isEqualTo(today)
-    val validationResult =
+    val validationResult = runBlocking {
       QuestionnaireResponseValidator.validateQuestionnaireResponse(
         questionnaire,
         getQuestionnaireResponse(),
-        context
+        context,
+        mapOf(),
+        mapOf()
       )
+    }
 
     assertThat(validationResult["link-1"]?.first()).isEqualTo(Valid)
   }
@@ -330,12 +334,15 @@ class QuestionnaireUiEspressoTest {
       .perform(ViewActions.click())
 
     val maxDateAllowed = maxDate.valueAsString
-    val validationResult =
+    val validationResult = runBlocking {
       QuestionnaireResponseValidator.validateQuestionnaireResponse(
         questionnaire,
         getQuestionnaireResponse(),
-        context
+        context,
+        mapOf(),
+        mapOf()
       )
+    }
 
     assertThat((validationResult["link-1"]?.first() as Invalid).getSingleStringValidationMessage())
       .isEqualTo("Maximum value allowed is:$maxDateAllowed")
@@ -372,12 +379,15 @@ class QuestionnaireUiEspressoTest {
       .perform(ViewActions.click())
 
     val minDateAllowed = minDate.valueAsString
-    val validationResult =
+    val validationResult = runBlocking {
       QuestionnaireResponseValidator.validateQuestionnaireResponse(
         questionnaire,
         getQuestionnaireResponse(),
-        context
+        context,
+        mapOf(),
+        mapOf()
       )
+    }
 
     assertThat((validationResult["link-1"]?.first() as Invalid).getSingleStringValidationMessage())
       .isEqualTo("Minimum value allowed is:$minDateAllowed")
@@ -519,6 +529,6 @@ class QuestionnaireUiEspressoTest {
         activity.supportFragmentManager.findFragmentById(R.id.container_holder)
           as QuestionnaireFragment
     }
-    return testQuestionnaireFragment!!.getQuestionnaireResponse()
+    return runBlocking { testQuestionnaireFragment!!.getQuestionnaireResponse() }
   }
 }

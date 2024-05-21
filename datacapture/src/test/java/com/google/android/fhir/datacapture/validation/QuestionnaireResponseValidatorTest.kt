@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2023 Google LLC
+ * Copyright 2022-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.android.fhir.datacapture.extensions.EXTENSION_HIDDEN_URL
 import com.google.common.truth.Truth.assertThat
 import java.math.BigDecimal
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.hl7.fhir.r4.model.Attachment
 import org.hl7.fhir.r4.model.BooleanType
 import org.hl7.fhir.r4.model.Coding
@@ -56,7 +58,7 @@ class QuestionnaireResponseValidatorTest {
   }
 
   @Test
-  fun validateQuestionnaireResponse_followMaxLengthConstraint_shouldReturnValidResult() {
+  fun validateQuestionnaireResponse_followMaxLengthConstraint_shouldReturnValidResult() = runTest {
     val questionnaire =
       Questionnaire()
         .addItem(
@@ -90,44 +92,45 @@ class QuestionnaireResponseValidatorTest {
   }
 
   @Test
-  fun validateQuestionnaireResponse_violateMaxLengthConstraint_shouldReturnInvalidResultWithMessages() {
-    val questionnaire =
-      Questionnaire()
-        .addItem(
-          Questionnaire.QuestionnaireItemComponent()
-            .setLinkId("a-question")
-            .setMaxLength(3)
-            .setType(Questionnaire.QuestionnaireItemType.INTEGER)
-            .setText("Age in years?")
-        )
-    val questionnaireResponse =
-      QuestionnaireResponse()
-        .addItem(
-          QuestionnaireResponse.QuestionnaireResponseItemComponent()
-            .setLinkId("a-question")
-            .setAnswer(
-              listOf(
-                QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent()
-                  .setValue(IntegerType(1000))
+  fun validateQuestionnaireResponse_violateMaxLengthConstraint_shouldReturnInvalidResultWithMessages() =
+    runTest {
+      val questionnaire =
+        Questionnaire()
+          .addItem(
+            Questionnaire.QuestionnaireItemComponent()
+              .setLinkId("a-question")
+              .setMaxLength(3)
+              .setType(Questionnaire.QuestionnaireItemType.INTEGER)
+              .setText("Age in years?")
+          )
+      val questionnaireResponse =
+        QuestionnaireResponse()
+          .addItem(
+            QuestionnaireResponse.QuestionnaireResponseItemComponent()
+              .setLinkId("a-question")
+              .setAnswer(
+                listOf(
+                  QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent()
+                    .setValue(IntegerType(1000))
+                )
               )
-            )
+          )
+      val result =
+        QuestionnaireResponseValidator.validateQuestionnaireResponse(
+          questionnaire,
+          questionnaireResponse,
+          context,
+          mapOf(),
+          mapOf()
         )
-    val result =
-      QuestionnaireResponseValidator.validateQuestionnaireResponse(
-        questionnaire,
-        questionnaireResponse,
-        context,
-        mapOf(),
-        mapOf()
-      )
-    assertThat(result["a-question"]!!.single())
-      .isEqualTo(
-        Invalid(listOf("The maximum number of characters that are permitted in the answer is: 3"))
-      )
-  }
+      assertThat(result["a-question"]!!.single())
+        .isEqualTo(
+          Invalid(listOf("The maximum number of characters that are permitted in the answer is: 3"))
+        )
+    }
 
   @Test
-  fun validateQuestionnaireResponse_nestedItems_shouldReturnInvalidResultWithMessages() {
+  fun validateQuestionnaireResponse_nestedItems_shouldReturnInvalidResultWithMessages() = runTest {
     val questionnaire =
       Questionnaire()
         .addItem(
@@ -198,7 +201,7 @@ class QuestionnaireResponseValidatorTest {
   }
 
   @Test
-  fun `validation passes if question is required but not enabled`() {
+  fun `validation passes if question is required but not enabled`() = runTest {
     val questionnaire =
       Questionnaire().apply {
         url = "questionnaire-1"
@@ -250,59 +253,64 @@ class QuestionnaireResponseValidatorTest {
   }
 
   @Test
-  fun validateQuestionnaireResponse_questionnaireResponseHasFewerItems_shouldReturnValidResult() {
-    val questionnaire =
-      Questionnaire().apply {
-        url = "questionnaire-1"
-        addItem(
-          Questionnaire.QuestionnaireItemComponent(
-            StringType("question-1"),
-            Enumeration(
-              Questionnaire.QuestionnaireItemTypeEnumFactory(),
-              Questionnaire.QuestionnaireItemType.STRING
+  fun validateQuestionnaireResponse_questionnaireResponseHasFewerItems_shouldReturnValidResult() =
+    runTest {
+      val questionnaire =
+        Questionnaire().apply {
+          url = "questionnaire-1"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent(
+              StringType("question-1"),
+              Enumeration(
+                Questionnaire.QuestionnaireItemTypeEnumFactory(),
+                Questionnaire.QuestionnaireItemType.STRING
+              )
             )
           )
-        )
-        addItem(
-          Questionnaire.QuestionnaireItemComponent(
-            StringType("question-2"),
-            Enumeration(
-              Questionnaire.QuestionnaireItemTypeEnumFactory(),
-              Questionnaire.QuestionnaireItemType.STRING
+          addItem(
+            Questionnaire.QuestionnaireItemComponent(
+              StringType("question-2"),
+              Enumeration(
+                Questionnaire.QuestionnaireItemTypeEnumFactory(),
+                Questionnaire.QuestionnaireItemType.STRING
+              )
             )
           )
-        )
-        addItem(
-          Questionnaire.QuestionnaireItemComponent(
-            StringType("question-3"),
-            Enumeration(
-              Questionnaire.QuestionnaireItemTypeEnumFactory(),
-              Questionnaire.QuestionnaireItemType.STRING
+          addItem(
+            Questionnaire.QuestionnaireItemComponent(
+              StringType("question-3"),
+              Enumeration(
+                Questionnaire.QuestionnaireItemTypeEnumFactory(),
+                Questionnaire.QuestionnaireItemType.STRING
+              )
             )
           )
-        )
-      }
+        }
 
-    val questionnaireResponse =
-      QuestionnaireResponse().apply {
-        this.questionnaire = "questionnaire-1"
-        addItem(QuestionnaireResponse.QuestionnaireResponseItemComponent(StringType("question-1")))
-        addItem(QuestionnaireResponse.QuestionnaireResponseItemComponent(StringType("question-3")))
-      }
+      val questionnaireResponse =
+        QuestionnaireResponse().apply {
+          this.questionnaire = "questionnaire-1"
+          addItem(
+            QuestionnaireResponse.QuestionnaireResponseItemComponent(StringType("question-1"))
+          )
+          addItem(
+            QuestionnaireResponse.QuestionnaireResponseItemComponent(StringType("question-3"))
+          )
+        }
 
-    val result =
-      QuestionnaireResponseValidator.validateQuestionnaireResponse(
-        questionnaire,
-        questionnaireResponse,
-        context,
-        mapOf(),
-        mapOf()
-      )
-    assertThat(result["question-1"]!!.single()).isEqualTo(Valid)
-  }
+      val result =
+        QuestionnaireResponseValidator.validateQuestionnaireResponse(
+          questionnaire,
+          questionnaireResponse,
+          context,
+          mapOf(),
+          mapOf()
+        )
+      assertThat(result["question-1"]!!.single()).isEqualTo(Valid)
+    }
 
   @Test
-  fun `validation passes if questionnaire response matches questionnaire`() {
+  fun `validation passes if questionnaire response matches questionnaire`() = runTest {
     QuestionnaireResponseValidator.validateQuestionnaireResponse(
       Questionnaire().apply {
         url = "http://www.sample-org/FHIR/Resources/Questionnaire/questionnaire-1"
@@ -327,7 +335,7 @@ class QuestionnaireResponseValidatorTest {
   }
 
   @Test
-  fun `validation passes if questionnaire response does not specify questionnaire`() {
+  fun `validation passes if questionnaire response does not specify questionnaire`() = runTest {
     QuestionnaireResponseValidator.validateQuestionnaireResponse(
       Questionnaire().apply { url = "questionnaire-1" },
       QuestionnaireResponse(),
@@ -383,7 +391,7 @@ class QuestionnaireResponseValidatorTest {
   }
 
   @Test
-  fun `validation passes for questionnaire item type DISPLAY`() {
+  fun `validation passes for questionnaire item type DISPLAY`() = runTest {
     QuestionnaireResponseValidator.validateQuestionnaireResponse(
       Questionnaire().apply {
         url = "questionnaire-1"
@@ -408,7 +416,7 @@ class QuestionnaireResponseValidatorTest {
   }
 
   @Test
-  fun `validation passes for questionnaire item type NULL`() {
+  fun `validation passes for questionnaire item type NULL`() = runTest {
     QuestionnaireResponseValidator.validateQuestionnaireResponse(
       Questionnaire().apply {
         url = "questionnaire-1"
@@ -433,93 +441,99 @@ class QuestionnaireResponseValidatorTest {
   }
 
   @Test
-  fun `validation passes for required questionnaire item with hidden extension when no value specified`() {
-    val questionnaire =
-      Questionnaire().apply {
-        url = "questionnaire-1"
-        addItem(
-          Questionnaire.QuestionnaireItemComponent(
-              StringType("valid-hidden-item"),
-              Enumeration(
-                Questionnaire.QuestionnaireItemTypeEnumFactory(),
-                Questionnaire.QuestionnaireItemType.INTEGER
+  fun `validation passes for required questionnaire item with hidden extension when no value specified`() =
+    runTest {
+      val questionnaire =
+        Questionnaire().apply {
+          url = "questionnaire-1"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent(
+                StringType("valid-hidden-item"),
+                Enumeration(
+                  Questionnaire.QuestionnaireItemTypeEnumFactory(),
+                  Questionnaire.QuestionnaireItemType.INTEGER
+                )
               )
-            )
-            .apply {
-              this.required = true
-              addExtension().apply {
-                url = EXTENSION_HIDDEN_URL
-                setValue(BooleanType(true))
+              .apply {
+                this.required = true
+                addExtension().apply {
+                  url = EXTENSION_HIDDEN_URL
+                  setValue(BooleanType(true))
+                }
               }
-            }
-        )
-      }
-    val questionnaireResponse =
-      QuestionnaireResponse().apply {
-        this.questionnaire = "questionnaire-1"
-        addItem(
-          QuestionnaireResponse.QuestionnaireResponseItemComponent(StringType("valid-hidden-item"))
-        )
-      }
-
-    val result =
-      QuestionnaireResponseValidator.validateQuestionnaireResponse(
-        questionnaire,
-        questionnaireResponse,
-        context,
-        mapOf(),
-        mapOf()
-      )
-
-    assertThat(result.entries.first().key).isEqualTo("valid-hidden-item")
-    assertThat(result.entries.first().value.first()).isEqualTo(NotValidated)
-  }
-
-  @Test
-  fun `validation fails for required questionnaire item with hidden extension set to false when no value specified`() {
-    val questionnaire =
-      Questionnaire().apply {
-        url = "questionnaire-1"
-        addItem(
-          Questionnaire.QuestionnaireItemComponent(
-              StringType("valid-hidden-item"),
-              Enumeration(
-                Questionnaire.QuestionnaireItemTypeEnumFactory(),
-                Questionnaire.QuestionnaireItemType.INTEGER
-              )
+          )
+        }
+      val questionnaireResponse =
+        QuestionnaireResponse().apply {
+          this.questionnaire = "questionnaire-1"
+          addItem(
+            QuestionnaireResponse.QuestionnaireResponseItemComponent(
+              StringType("valid-hidden-item")
             )
-            .apply {
-              this.required = true
-              addExtension().apply {
-                url = EXTENSION_HIDDEN_URL
-                setValue(BooleanType(false))
-              }
-            }
-        )
-      }
-    val questionnaireResponse =
-      QuestionnaireResponse().apply {
-        this.questionnaire = "questionnaire-1"
-        addItem(
-          QuestionnaireResponse.QuestionnaireResponseItemComponent(StringType("valid-hidden-item"))
-        )
-      }
+          )
+        }
 
-    val result =
-      QuestionnaireResponseValidator.validateQuestionnaireResponse(
+      val result =
+        QuestionnaireResponseValidator.validateQuestionnaireResponse(
           questionnaire,
           questionnaireResponse,
           context,
           mapOf(),
           mapOf()
         )
-        .entries.first()
 
-    assertThat(result.key).isEqualTo("valid-hidden-item")
-    assertThat(result.value.first()).isInstanceOf(Invalid::class.java)
-    assertThat((result.value.first() as Invalid).getSingleStringValidationMessage())
-      .isEqualTo("Missing answer for required field.")
-  }
+      assertThat(result.entries.first().key).isEqualTo("valid-hidden-item")
+      assertThat(result.entries.first().value.first()).isEqualTo(NotValidated)
+    }
+
+  @Test
+  fun `validation fails for required questionnaire item with hidden extension set to false when no value specified`() =
+    runTest {
+      val questionnaire =
+        Questionnaire().apply {
+          url = "questionnaire-1"
+          addItem(
+            Questionnaire.QuestionnaireItemComponent(
+                StringType("valid-hidden-item"),
+                Enumeration(
+                  Questionnaire.QuestionnaireItemTypeEnumFactory(),
+                  Questionnaire.QuestionnaireItemType.INTEGER
+                )
+              )
+              .apply {
+                this.required = true
+                addExtension().apply {
+                  url = EXTENSION_HIDDEN_URL
+                  setValue(BooleanType(false))
+                }
+              }
+          )
+        }
+      val questionnaireResponse =
+        QuestionnaireResponse().apply {
+          this.questionnaire = "questionnaire-1"
+          addItem(
+            QuestionnaireResponse.QuestionnaireResponseItemComponent(
+              StringType("valid-hidden-item")
+            )
+          )
+        }
+
+      val result =
+        QuestionnaireResponseValidator.validateQuestionnaireResponse(
+            questionnaire,
+            questionnaireResponse,
+            context,
+            mapOf(),
+            mapOf()
+          )
+          .entries.first()
+
+      assertThat(result.key).isEqualTo("valid-hidden-item")
+      assertThat(result.value.first()).isInstanceOf(Invalid::class.java)
+      assertThat((result.value.first() as Invalid).getSingleStringValidationMessage())
+        .isEqualTo("Missing answer for required field.")
+    }
 
   @Test
   fun `validate recursively for questionnaire item type GROUP`() {
@@ -1668,13 +1682,15 @@ class QuestionnaireResponseValidatorTest {
   ) {
     val exception =
       assertThrows(IllegalArgumentException::class.java) {
-        QuestionnaireResponseValidator.validateQuestionnaireResponse(
-          questionnaire,
-          questionnaireResponse,
-          context,
-          mapOf(),
-          mapOf()
-        )
+        runBlocking {
+          QuestionnaireResponseValidator.validateQuestionnaireResponse(
+            questionnaire,
+            questionnaireResponse,
+            context,
+            mapOf(),
+            mapOf()
+          )
+        }
       }
     assertThat(exception.message).isEqualTo(message)
   }
@@ -1687,13 +1703,15 @@ class QuestionnaireResponseValidatorTest {
   ) {
     val exception =
       assertThrows(IllegalStateException::class.java) {
-        QuestionnaireResponseValidator.validateQuestionnaireResponse(
-          questionnaire,
-          questionnaireResponse,
-          context,
-          mapOf(),
-          mapOf()
-        )
+        runBlocking {
+          QuestionnaireResponseValidator.validateQuestionnaireResponse(
+            questionnaire,
+            questionnaireResponse,
+            context,
+            mapOf(),
+            mapOf()
+          )
+        }
       }
     assertThat(exception.message).isEqualTo(message)
   }

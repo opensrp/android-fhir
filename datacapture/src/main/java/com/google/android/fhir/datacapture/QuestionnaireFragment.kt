@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.fhir.datacapture.validation.Invalid
 import com.google.android.fhir.datacapture.views.factories.QuestionnaireItemViewHolderFactory
 import com.google.android.material.progressindicator.LinearProgressIndicator
+import kotlinx.coroutines.launch
 import org.hl7.fhir.r4.model.Questionnaire
 import timber.log.Timber
 
@@ -97,17 +98,19 @@ class QuestionnaireFragment : Fragment() {
     val paginationNextButton = view.findViewById<View>(R.id.pagination_next_button)
     paginationNextButton.setOnClickListener { viewModel.goToNextPage() }
     view.findViewById<Button>(R.id.submit_questionnaire).setOnClickListener {
-      viewModel.validateQuestionnaireAndUpdateUI().let { validationMap ->
-        if (validationMap.values.flatten().filterIsInstance<Invalid>().isEmpty()) {
-          setFragmentResult(SUBMIT_REQUEST_KEY, Bundle.EMPTY)
-        } else {
-          val errorViewModel: QuestionnaireValidationErrorViewModel by activityViewModels()
-          errorViewModel.setQuestionnaireAndValidation(viewModel.questionnaire, validationMap)
-          QuestionnaireValidationErrorMessageDialogFragment()
-            .show(
-              requireActivity().supportFragmentManager,
-              QuestionnaireValidationErrorMessageDialogFragment.TAG
-            )
+      lifecycleScope.launch {
+        viewModel.validateQuestionnaireAndUpdateUI().let { validationMap ->
+          if (validationMap.values.flatten().filterIsInstance<Invalid>().isEmpty()) {
+            setFragmentResult(SUBMIT_REQUEST_KEY, Bundle.EMPTY)
+          } else {
+            val errorViewModel: QuestionnaireValidationErrorViewModel by activityViewModels()
+            errorViewModel.setQuestionnaireAndValidation(viewModel.questionnaire, validationMap)
+            QuestionnaireValidationErrorMessageDialogFragment()
+              .show(
+                requireActivity().supportFragmentManager,
+                QuestionnaireValidationErrorMessageDialogFragment.TAG
+              )
+          }
         }
       }
     }

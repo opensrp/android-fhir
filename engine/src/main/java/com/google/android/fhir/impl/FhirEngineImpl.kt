@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ internal class FhirEngineImpl(private val database: Database, private val contex
   override suspend fun <R : Resource> search(search: Search): List<SearchResult<R>> {
     return search.execute(database)
   }
-/*
+  /*
   suspend fun sample(dateFrom: Long, limit: Long) {
 
     val searchQuery =

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,10 +36,13 @@ import com.google.android.fhir.datacapture.extensions.entryMode
 import com.google.android.fhir.datacapture.extensions.flattened
 import com.google.android.fhir.datacapture.extensions.hasDifferentAnswerSet
 import com.google.android.fhir.datacapture.extensions.isDisplayItem
-import com.google.android.fhir.datacapture.extensions.isFhirPath
 import com.google.android.fhir.datacapture.extensions.isHidden
 import com.google.android.fhir.datacapture.extensions.isPaginated
 import com.google.android.fhir.datacapture.extensions.localizedTextSpanned
+import com.google.android.fhir.datacapture.extensions.maxValue
+import com.google.android.fhir.datacapture.extensions.maxValueCqfCalculatedValueExpression
+import com.google.android.fhir.datacapture.extensions.minValue
+import com.google.android.fhir.datacapture.extensions.minValueCqfCalculatedValueExpression
 import com.google.android.fhir.datacapture.extensions.packRepeatedGroups
 import com.google.android.fhir.datacapture.extensions.questionnaireLaunchContexts
 import com.google.android.fhir.datacapture.extensions.shouldHaveNestedItemsUnderAnswers
@@ -48,7 +51,7 @@ import com.google.android.fhir.datacapture.extensions.validateLaunchContextExten
 import com.google.android.fhir.datacapture.extensions.zipByLinkId
 import com.google.android.fhir.datacapture.fhirpath.ExpressionEvaluator.detectExpressionCyclicDependency
 import com.google.android.fhir.datacapture.fhirpath.ExpressionEvaluator.evaluateCalculatedExpressions
-import com.google.android.fhir.datacapture.fhirpath.ExpressionEvaluator.evaluateExpression
+import com.google.android.fhir.datacapture.fhirpath.ExpressionEvaluator.evaluateExpressionValue
 import com.google.android.fhir.datacapture.validation.Invalid
 import com.google.android.fhir.datacapture.validation.NotValidated
 import com.google.android.fhir.datacapture.validation.QuestionnaireResponseItemValidator
@@ -67,8 +70,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.withIndex
-import org.hl7.fhir.r4.model.Base
-import org.hl7.fhir.r4.model.Element
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.Questionnaire.QuestionnaireItemComponent
 import org.hl7.fhir.r4.model.QuestionnaireResponse
@@ -98,7 +99,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
           if (state.contains(QuestionnaireFragment.EXTRA_QUESTIONNAIRE_JSON_STRING)) {
             Timber.w(
               "Both EXTRA_QUESTIONNAIRE_JSON_URI & EXTRA_QUESTIONNAIRE_JSON_STRING are provided. " +
-                "EXTRA_QUESTIONNAIRE_JSON_URI takes precedence."
+                "EXTRA_QUESTIONNAIRE_JSON_URI takes precedence.",
             )
           }
           val uri: Uri = state[QuestionnaireFragment.EXTRA_QUESTIONNAIRE_JSON_URI]!!
@@ -111,7 +112,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
         }
         else ->
           error(
-            "Neither EXTRA_QUESTIONNAIRE_JSON_URI nor EXTRA_QUESTIONNAIRE_JSON_STRING is supplied."
+            "Neither EXTRA_QUESTIONNAIRE_JSON_URI nor EXTRA_QUESTIONNAIRE_JSON_STRING is supplied.",
           )
       }
   }
@@ -125,7 +126,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
         if (state.contains(QuestionnaireFragment.EXTRA_QUESTIONNAIRE_RESPONSE_JSON_STRING)) {
           Timber.w(
             "Both EXTRA_QUESTIONNAIRE_RESPONSE_JSON_URI & EXTRA_QUESTIONNAIRE_RESPONSE_JSON_STRING are provided. " +
-              "EXTRA_QUESTIONNAIRE_RESPONSE_JSON_URI takes precedence."
+              "EXTRA_QUESTIONNAIRE_RESPONSE_JSON_URI takes precedence.",
           )
         }
         val uri: Uri = state[QuestionnaireFragment.EXTRA_QUESTIONNAIRE_RESPONSE_JSON_URI]!!
@@ -389,7 +390,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       item =
         getEnabledResponseItems(
             this@QuestionnaireViewModel.questionnaire.item,
-            questionnaireResponse.item
+            questionnaireResponse.item,
           )
           .map { it.copy() }
       unpackRepeatedGroups(this@QuestionnaireViewModel.questionnaire)
@@ -400,7 +401,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
    * Validates entire questionnaire and return the validation results. As a side effect, it triggers
    * the UI update to show errors in case there are any validation errors.
    */
-  internal fun validateQuestionnaireAndUpdateUI(): Map<String, List<ValidationResult>> =
+  internal suspend fun validateQuestionnaireAndUpdateUI(): Map<String, List<ValidationResult>> =
     QuestionnaireResponseValidator.validateQuestionnaireResponse(
         questionnaire,
         questionnaireResponse,
@@ -499,11 +500,11 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       )
 
   private fun updateDependentQuestionnaireResponseItems(
-    updatedQuestionnaireItem: QuestionnaireItemComponent,
+    questionnaireItem: QuestionnaireItemComponent,
     updatedQuestionnaireResponseItem: QuestionnaireResponseItemComponent?,
   ) {
     evaluateCalculatedExpressions(
-        updatedQuestionnaireItem,
+        questionnaireItem,
         updatedQuestionnaireResponseItem,
         questionnaire,
         questionnaireResponse,
@@ -529,27 +530,6 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
             }
           }
       }
-  }
-
-  private fun resolveCqfExpression(
-    questionnaireItem: QuestionnaireItemComponent,
-    questionnaireResponseItem: QuestionnaireResponseItemComponent,
-    element: Element,
-  ): List<Base> {
-    val cqfExpression = element.cqfExpression ?: return emptyList()
-
-    if (!cqfExpression.isFhirPath) {
-      throw UnsupportedOperationException("${cqfExpression.language} not supported yet")
-    }
-    return evaluateExpression(
-      questionnaire,
-      questionnaireResponse,
-      questionnaireItem,
-      questionnaireResponseItem,
-      cqfExpression,
-      questionnaireItemParentMap,
-      questionnaireLaunchContextMap
-    )
   }
 
   private fun removeDisabledAnswers(
@@ -682,17 +662,35 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
         QuestionnaireResponseItemValidator.validate(
           questionnaireItem,
           questionnaireResponseItem.answer,
-          this@QuestionnaireViewModel.getApplication()
-        )
+          this@QuestionnaireViewModel.getApplication(),
+        ) {
+          evaluateExpressionValue(
+            questionnaire,
+            questionnaireResponse,
+            questionnaireItem,
+            questionnaireResponseItem,
+            it,
+            questionnaireItemParentMap,
+            questionnaireLaunchContextMap
+          )
+        }
       } else {
         NotValidated
       }
 
     // Set question text dynamically from CQL expression
-    questionnaireResponseItem.apply {
-      resolveCqfExpression(questionnaireItem, this, questionnaireItem.textElement)
-        .firstOrNull()
-        ?.let { text = it.primitiveValue() }
+    questionnaireItem.textElement.cqfExpression?.let { expression ->
+      evaluateExpressionValue(
+          questionnaire,
+          questionnaireResponse,
+          questionnaireItem,
+          questionnaireResponseItem,
+          expression,
+          questionnaireItemParentMap,
+          questionnaireLaunchContextMap
+        )
+        ?.primitiveValue()
+        ?.let { questionnaireResponseItem.text = it }
     }
     val (enabledQuestionnaireAnswerOptions, disabledQuestionnaireResponseAnswers) =
       answerOptionsEvaluator.evaluate(
@@ -720,6 +718,32 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
             validationResult = validationResult,
             answersChangedCallback = answersChangedCallback,
             enabledAnswerOptions = enabledQuestionnaireAnswerOptions,
+            minAnswerValue =
+              questionnaireItem.minValueCqfCalculatedValueExpression?.let {
+                evaluateExpressionValue(
+                  questionnaire,
+                  questionnaireResponse,
+                  questionnaireItem,
+                  questionnaireResponseItem,
+                  it,
+                  questionnaireItemParentMap,
+                  questionnaireLaunchContextMap
+                )
+              }
+                ?: questionnaireItem.minValue,
+            maxAnswerValue =
+              questionnaireItem.maxValueCqfCalculatedValueExpression?.let {
+                evaluateExpressionValue(
+                  questionnaire,
+                  questionnaireResponse,
+                  questionnaireItem,
+                  questionnaireResponseItem,
+                  it,
+                  questionnaireItemParentMap,
+                  questionnaireLaunchContextMap
+                )
+              }
+                ?: questionnaireItem.maxValue,
             draftAnswer = draftAnswerMap[questionnaireResponseItem],
             enabledDisplayItems =
               questionnaireItem.item.filter {

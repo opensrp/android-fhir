@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -123,14 +123,14 @@ private enum class QuestionnaireLaunchContextSet(
   val system: String,
   val resourceType: String,
 ) {
-  PATIENT("patient", "Patient", EXTENSION_LAUNCH_CONTEXT, "Patient"),
-  ENCOUNTER("encounter", "Encounter", EXTENSION_LAUNCH_CONTEXT, "Encounter"),
-  LOCATION("location", "Location", EXTENSION_LAUNCH_CONTEXT, "Location"),
-  USER_AS_PATIENT("user", "User", EXTENSION_LAUNCH_CONTEXT, "Patient"),
-  USER_AS_PRACTITIONER("user", "User", EXTENSION_LAUNCH_CONTEXT, "Practitioner"),
-  USER_AS_PRACTITIONER_ROLE("user", "User", EXTENSION_LAUNCH_CONTEXT, "PractitionerRole"),
-  USER_AS_RELATED_PERSON("user", "User", EXTENSION_LAUNCH_CONTEXT, "RelatedPerson"),
-  STUDY("study", "ResearchStudy", EXTENSION_LAUNCH_CONTEXT, "ResearchStudy"),
+  PATIENT("patient", "Patient", CODE_SYSTEM_LAUNCH_CONTEXT, "Patient"),
+  ENCOUNTER("encounter", "Encounter", CODE_SYSTEM_LAUNCH_CONTEXT, "Encounter"),
+  LOCATION("location", "Location", CODE_SYSTEM_LAUNCH_CONTEXT, "Location"),
+  USER_AS_PATIENT("user", "User", CODE_SYSTEM_LAUNCH_CONTEXT, "Patient"),
+  USER_AS_PRACTITIONER("user", "User", CODE_SYSTEM_LAUNCH_CONTEXT, "Practitioner"),
+  USER_AS_PRACTITIONER_ROLE("user", "User", CODE_SYSTEM_LAUNCH_CONTEXT, "PractitionerRole"),
+  USER_AS_RELATED_PERSON("user", "User", CODE_SYSTEM_LAUNCH_CONTEXT, "RelatedPerson"),
+  STUDY("study", "ResearchStudy", CODE_SYSTEM_LAUNCH_CONTEXT, "ResearchStudy"),
 }
 
 /**
@@ -155,7 +155,8 @@ internal const val EXTENSION_ENTRY_MODE_URL: String =
 internal const val EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT =
   "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext"
 
-internal const val EXTENSION_LAUNCH_CONTEXT = "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext"
+internal const val CODE_SYSTEM_LAUNCH_CONTEXT =
+  "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext"
 
 val Questionnaire.entryMode: EntryMode?
   get() {

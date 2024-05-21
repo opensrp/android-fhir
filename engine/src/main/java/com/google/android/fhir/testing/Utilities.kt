@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import com.google.android.fhir.LocalChange
 import com.google.android.fhir.SearchResult
 import com.google.android.fhir.db.impl.dao.LocalChangeToken
 import com.google.android.fhir.search.Search
+import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.sync.BundleDownloadRequest
 import com.google.android.fhir.sync.BundleUploadRequest
 import com.google.android.fhir.sync.ConflictResolver
@@ -143,6 +144,10 @@ object TestFhirEngineImpl : FhirEngine {
   override suspend fun delete(type: ResourceType, id: String) {}
 
   override suspend fun <R : Resource> search(search: Search): List<SearchResult<R>> {
+    return emptyList()
+  }
+
+  override suspend fun <R : Resource> search(searchQuery: SearchQuery): List<R> {
     return emptyList()
   }
 

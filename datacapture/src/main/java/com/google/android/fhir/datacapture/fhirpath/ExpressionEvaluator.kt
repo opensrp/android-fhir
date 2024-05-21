@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.google.android.fhir.datacapture.fhirpath
 import com.google.android.fhir.datacapture.extensions.calculatedExpression
 import com.google.android.fhir.datacapture.extensions.findVariableExpression
 import com.google.android.fhir.datacapture.extensions.flattened
+import com.google.android.fhir.datacapture.extensions.isFhirPath
 import com.google.android.fhir.datacapture.extensions.isReferencedBy
 import com.google.android.fhir.datacapture.extensions.variableExpressions
 import org.hl7.fhir.exceptions.FHIRException
@@ -102,6 +103,8 @@ object ExpressionEvaluator {
   ): List<Base> {
     val appContext =
       mutableMapOf<String, Base?>().apply {
+        launchContextMap?.let { putAll(it) }
+
         extractDependentVariables(
           expression,
           questionnaire,
@@ -119,6 +122,39 @@ object ExpressionEvaluator {
       questionnaireResponseItem,
       expression.expression
     )
+  }
+
+  /**
+   * Returns single [Type] evaluation value result of an expression, including cqf-expression and
+   * cqf-calculatedValue expressions
+   */
+  suspend fun evaluateExpressionValue(
+    questionnaire: Questionnaire,
+    questionnaireResponse: QuestionnaireResponse,
+    questionnaireItem: QuestionnaireItemComponent,
+    questionnaireResponseItem: QuestionnaireResponseItemComponent?,
+    expression: Expression,
+    questionnaireItemParentMap: Map<QuestionnaireItemComponent, QuestionnaireItemComponent>,
+    launchContextMap: Map<String, Resource>?
+  ): Type? {
+    if (!expression.isFhirPath) {
+      throw UnsupportedOperationException("${expression.language} not supported yet")
+    }
+    return try {
+      evaluateExpression(
+          questionnaire,
+          questionnaireResponse,
+          questionnaireItem,
+          questionnaireResponseItem,
+          expression,
+          questionnaireItemParentMap,
+          launchContextMap
+        )
+        .singleOrNull() as? Type
+    } catch (e: Exception) {
+      Timber.w("Could not evaluate expression ${expression.expression} with FHIRPathEngine", e)
+      null
+    }
   }
 
   /**

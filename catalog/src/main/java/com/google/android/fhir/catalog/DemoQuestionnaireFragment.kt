@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -188,11 +188,13 @@ class DemoQuestionnaireFragment : Fragment() {
   }
 
   private fun onSubmitQuestionnaireClick() {
-    val questionnaireFragment =
-      childFragmentManager.findFragmentByTag(QUESTIONNAIRE_FRAGMENT_TAG) as QuestionnaireFragment
-    launchQuestionnaireResponseFragment(
-      viewModel.getQuestionnaireResponseJson(questionnaireFragment.getQuestionnaireResponse())
-    )
+    lifecycleScope.launch {
+      val questionnaireFragment =
+        childFragmentManager.findFragmentByTag(QUESTIONNAIRE_FRAGMENT_TAG) as QuestionnaireFragment
+      launchQuestionnaireResponseFragment(
+        viewModel.getQuestionnaireResponseJson(questionnaireFragment.getQuestionnaireResponse())
+      )
+    }
   }
 
   private fun launchQuestionnaireResponseFragment(response: String) {

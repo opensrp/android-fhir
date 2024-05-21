@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import ca.uhn.fhir.util.UrlUtil
 import com.google.android.fhir.datacapture.DataCapture
 import com.google.android.fhir.datacapture.QuestionnaireViewHolderType
 import com.google.android.fhir.datacapture.fhirpath.evaluateToDisplay
+import com.google.android.fhir.datacapture.validation.MAX_VALUE_EXTENSION_URL
+import com.google.android.fhir.datacapture.validation.MIN_VALUE_EXTENSION_URL
 import com.google.android.fhir.getLocalizedText
 import java.math.BigDecimal
 import kotlinx.coroutines.Dispatchers
@@ -107,9 +109,6 @@ internal const val EXTENSION_CHOICE_COLUMN_URL: String =
   "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-choiceColumn"
 
 internal const val EXTENSION_VARIABLE_URL = "http://hl7.org/fhir/StructureDefinition/variable"
-
-internal const val EXTENSION_CQF_CALCULATED_VALUE_URL: String =
-  "http://hl7.org/fhir/StructureDefinition/cqf-calculatedValue"
 
 internal const val EXTENSION_SLIDER_STEP_VALUE_URL =
   "http://hl7.org/fhir/StructureDefinition/questionnaire-sliderStepValue"
@@ -509,6 +508,18 @@ val Questionnaire.QuestionnaireItemComponent.sliderStepValue: Int?
     }
     return null
   }
+
+internal val Questionnaire.QuestionnaireItemComponent.minValue
+  get() = getExtensionByUrl(MIN_VALUE_EXTENSION_URL)?.value
+
+internal val Questionnaire.QuestionnaireItemComponent.minValueCqfCalculatedValueExpression
+  get() = getExtensionByUrl(MIN_VALUE_EXTENSION_URL)?.value?.cqfCalculatedValueExpression
+
+internal val Questionnaire.QuestionnaireItemComponent.maxValue
+  get() = getExtensionByUrl(MAX_VALUE_EXTENSION_URL)?.value
+
+internal val Questionnaire.QuestionnaireItemComponent.maxValueCqfCalculatedValueExpression
+  get() = getExtensionByUrl(MAX_VALUE_EXTENSION_URL)?.value?.cqfCalculatedValueExpression
 
 /**
  * The unit for the numerical question.

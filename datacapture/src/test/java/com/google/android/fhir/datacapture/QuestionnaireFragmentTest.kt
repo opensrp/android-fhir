@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Google LLC
+ * Copyright 2022-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import com.google.android.fhir.datacapture.QuestionnaireFragment.Companion.EXTRA
 import com.google.android.fhir.datacapture.testing.DataCaptureTestApplication
 import com.google.android.fhir.datacapture.views.factories.DateTimePickerViewHolderFactory
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.test.runTest
 import org.hl7.fhir.r4.model.Questionnaire
 import org.junit.Before
 import org.junit.Test
@@ -74,8 +75,13 @@ class QuestionnaireFragmentTest {
       )
     scenario.moveToState(Lifecycle.State.RESUMED)
     scenario.withFragment {
-      assertThat(this.getQuestionnaireResponse()).isNotNull()
-      assertThat(this.getQuestionnaireResponse().item.any { it.linkId == "a-link-id" }).isTrue()
+      runTest {
+        assertThat(this@withFragment.getQuestionnaireResponse()).isNotNull()
+        assertThat(
+            this@withFragment.getQuestionnaireResponse().item.any { it.linkId == "a-link-id" },
+          )
+          .isTrue()
+      }
     }
   }
 

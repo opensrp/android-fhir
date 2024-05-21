@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2023 Google LLC
+ * Copyright 2022-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.fhir.datacapture.validation.QuestionnaireResponseValidator
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.runBlocking
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.QuestionnaireResponse
 import org.hl7.fhir.r4.model.StringType
@@ -79,13 +80,15 @@ class QuestionnaireValidationErrorMessageDialogFragmentTest {
     QuestionnaireValidationErrorViewModel().apply {
       setQuestionnaireAndValidation(
         questionnaire,
-        QuestionnaireResponseValidator.validateQuestionnaireResponse(
-          questionnaire,
-          questionnaireResponse,
-          RuntimeEnvironment.getApplication(),
-          mapOf(),
-          mapOf()
-        )
+        runBlocking {
+          QuestionnaireResponseValidator.validateQuestionnaireResponse(
+            questionnaire,
+            questionnaireResponse,
+            RuntimeEnvironment.getApplication(),
+            mapOf(),
+            mapOf()
+          )
+        }
       )
     }
 

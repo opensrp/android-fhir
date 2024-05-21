@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2023 Google LLC
+ * Copyright 2022-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.google.android.fhir.datacapture.validation
 import android.content.Context
 import com.google.android.fhir.datacapture.enablement.EnablementEvaluator
 import com.google.android.fhir.datacapture.extensions.packRepeatedGroups
+import com.google.android.fhir.datacapture.fhirpath.ExpressionEvaluator.evaluateExpressionValue
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.QuestionnaireResponse
 import org.hl7.fhir.r4.model.Resource
@@ -54,7 +55,7 @@ object QuestionnaireResponseValidator {
    *
    * @return a map[linkIdToValidationResultMap] of linkIds to list of ValidationResult
    */
-  fun validateQuestionnaireResponse(
+  suspend fun validateQuestionnaireResponse(
     questionnaire: Questionnaire,
     questionnaireResponse: QuestionnaireResponse,
     context: Context,
@@ -78,6 +79,7 @@ object QuestionnaireResponseValidator {
       EnablementEvaluator(questionnaireResponse),
       linkIdToValidationResultMap,
       questionnaire,
+      questionnaireResponse,
       questionnaireItemParentMap,
       launchContextMap
     )
@@ -85,13 +87,14 @@ object QuestionnaireResponseValidator {
     return linkIdToValidationResultMap
   }
 
-  private fun validateQuestionnaireResponseItems(
+  private suspend fun validateQuestionnaireResponseItems(
     questionnaireItemList: List<Questionnaire.QuestionnaireItemComponent>,
     questionnaireResponseItemList: List<QuestionnaireResponse.QuestionnaireResponseItemComponent>,
     context: Context,
     enablementEvaluator: EnablementEvaluator,
     linkIdToValidationResultMap: MutableMap<String, MutableList<ValidationResult>>,
     questionnaire: Questionnaire,
+    questionnaireResponse: QuestionnaireResponse,
     questionnaireItemParentMap:
       Map<Questionnaire.QuestionnaireItemComponent, Questionnaire.QuestionnaireItemComponent>,
     launchContextMap: Map<String, Resource>?
@@ -126,6 +129,7 @@ object QuestionnaireResponseValidator {
           enablementEvaluator,
           linkIdToValidationResultMap,
           questionnaire,
+          questionnaireResponse,
           questionnaireItemParentMap,
           launchContextMap
         )
@@ -134,13 +138,14 @@ object QuestionnaireResponseValidator {
     return linkIdToValidationResultMap
   }
 
-  private fun validateQuestionnaireResponseItem(
+  private suspend fun validateQuestionnaireResponseItem(
     questionnaireItem: Questionnaire.QuestionnaireItemComponent,
     questionnaireResponseItem: QuestionnaireResponse.QuestionnaireResponseItemComponent,
     context: Context,
     enablementEvaluator: EnablementEvaluator,
     linkIdToValidationResultMap: MutableMap<String, MutableList<ValidationResult>>,
     questionnaire: Questionnaire,
+    questionnaireResponse: QuestionnaireResponse,
     questionnaireItemParentMap:
       Map<Questionnaire.QuestionnaireItemComponent, Questionnaire.QuestionnaireItemComponent>,
     launchContextMap: Map<String, Resource>?
@@ -159,6 +164,7 @@ object QuestionnaireResponseValidator {
           enablementEvaluator,
           linkIdToValidationResultMap,
           questionnaire,
+          questionnaireResponse,
           questionnaireItemParentMap,
           launchContextMap
         )
@@ -175,6 +181,7 @@ object QuestionnaireResponseValidator {
             enablementEvaluator,
             linkIdToValidationResultMap,
             questionnaire,
+            questionnaireResponse,
             questionnaireItemParentMap,
             launchContextMap
           )
@@ -186,7 +193,17 @@ object QuestionnaireResponseValidator {
             questionnaireItem,
             questionnaireResponseItem.answer,
             context
-          )
+          ) { expression ->
+            evaluateExpressionValue(
+              questionnaire,
+              questionnaireResponse,
+              questionnaireItem,
+              questionnaireResponseItem,
+              expression,
+              questionnaireItemParentMap,
+              launchContextMap
+            )
+          }
         )
       }
     }
