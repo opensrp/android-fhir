@@ -50,12 +50,16 @@ import com.google.android.fhir.testing.readJsonArrayFromFile
 import com.google.android.fhir.versionId
 import com.google.common.truth.Correspondence
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.Date
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.hl7.fhir.r4.model.Address
 import org.hl7.fhir.r4.model.CarePlan
 import org.hl7.fhir.r4.model.CodeableConcept
@@ -120,7 +124,7 @@ class DatabaseImplTest {
   private fun buildFhirService(customSearchParameter: List<SearchParameter>? = null) {
     services =
       FhirServices.builder(context)
-        .inMemory()
+//        .inMemory()
         .apply {
           if (encrypted) enableEncryptionIfSupported()
           setSearchParameters(customSearchParameter)
@@ -148,6 +152,27 @@ class DatabaseImplTest {
     database.insert(*patients.toTypedArray())
     assertResourceEquals(TEST_PATIENT_1, database.select(ResourceType.Patient, TEST_PATIENT_1_ID))
     assertResourceEquals(TEST_PATIENT_2, database.select(ResourceType.Patient, TEST_PATIENT_2_ID))
+  }
+
+  @Test
+  fun select_transactionDelay() {
+    runBlocking {
+      database.insert(TEST_PATIENT_1)
+
+      launch {
+        println("Transaction started")
+        database.withTransaction {
+          delay(3000)
+        }
+        println("Transaction completed")
+      }
+
+      launch {
+        println("Patient Loading")
+        database.select(ResourceType.Patient, TEST_PATIENT_1_ID)
+        println("Patient Loaded")
+      }
+    }
   }
 
   @Test
