@@ -29,6 +29,7 @@ import com.google.android.fhir.SearchResult
 import com.google.android.fhir.UcumValue
 import com.google.android.fhir.UnitConverter
 import com.google.android.fhir.db.Database
+import com.google.android.fhir.db.ResourceWithUUID
 import com.google.android.fhir.epochDay
 import com.google.android.fhir.logicalId
 import com.google.android.fhir.ucumUrl
@@ -41,6 +42,7 @@ import org.hl7.fhir.r4.model.DateTimeType
 import org.hl7.fhir.r4.model.DateType
 import org.hl7.fhir.r4.model.Resource
 import timber.log.Timber
+import kotlin.system.measureTimeMillis
 
 /**
  * The multiplier used to determine the range for the `ap` search prefix. See
@@ -49,7 +51,12 @@ import timber.log.Timber
 private const val APPROXIMATION_COEFFICIENT = 0.1
 
 internal suspend fun <R : Resource> Search.execute(database: Database): List<SearchResult<R>> {
-  val baseResources = database.search<R>(getQuery())
+  val baseResources: List<ResourceWithUUID<R>>
+  val searchTimeInMillis = measureTimeMillis {
+    baseResources = database.search<R>(getQuery())
+  }
+  Timber.e("Search Query for ${baseResources.firstOrNull()?.resource?.resourceType} with ${baseResources.size} results took ${searchTimeInMillis}ms")
+
   val includedResources =
     if (forwardIncludes.isEmpty() || baseResources.isEmpty()) {
       null
@@ -69,23 +76,28 @@ internal suspend fun <R : Resource> Search.execute(database: Database): List<Sea
       )
     }
 
-  return baseResources.map { (uuid, baseResource) ->
-    SearchResult(
-      baseResource,
-      included =
+  val searchResults: List<SearchResult<R>>
+  val transformSearchResultTimeInMillis = measureTimeMillis {
+    searchResults = baseResources.map { (uuid, baseResource) ->
+      SearchResult(
+        baseResource,
+        included =
         includedResources
           ?.asSequence()
           ?.filter { it.baseResourceUUID == uuid }
           ?.groupBy({ it.searchIndex }, { it.resource }),
-      revIncluded =
+        revIncluded =
         revIncludedResources
           ?.asSequence()
           ?.filter {
             it.baseResourceTypeWithId == "${baseResource.fhirType()}/${baseResource.logicalId}"
           }
           ?.groupBy({ it.resource.resourceType to it.searchIndex }, { it.resource }),
-    )
+      )
+    }
   }
+  Timber.e("Transform resources to SearchResult for ${baseResources.firstOrNull()?.resource?.resourceType} with ${baseResources.size} baseResources, ${includedResources?.size ?: 0} includedResources and ${revIncludedResources?.size ?:0} revIncluded resources took ${transformSearchResultTimeInMillis}ms")
+  return searchResults
 }
 
 internal suspend fun Search.count(database: Database): Long {

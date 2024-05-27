@@ -179,12 +179,10 @@ internal class DatabaseImpl(
   }
 
   override suspend fun select(type: ResourceType, id: String): Resource {
-    return db.withTransaction {
-      resourceDao.getResource(resourceId = id, resourceType = type)?.let {
+    return resourceDao.getResource(resourceId = id, resourceType = type)?.let {
         iParser.parseResource(it)
-      }
+      } as? Resource
         ?: throw ResourceNotFoundException(type.name, id)
-    } as Resource
   }
 
   override suspend fun insertSyncedResources(resources: List<Resource>) {
@@ -210,19 +208,16 @@ internal class DatabaseImpl(
   override suspend fun <R : Resource> search(
     query: SearchQuery,
   ): List<ResourceWithUUID<R>> {
-    return db.withTransaction {
-      resourceDao
+    return resourceDao
         .getResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
         .map { ResourceWithUUID(it.uuid, iParser.parseResource(it.serializedResource) as R) }
         .distinctBy { it.uuid }
-    }
   }
 
   override suspend fun searchForwardReferencedResources(
     query: SearchQuery,
   ): List<ForwardIncludeSearchResult> {
-    return db.withTransaction {
-      resourceDao
+    return resourceDao
         .getForwardReferencedResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
         .map {
           ForwardIncludeSearchResult(
@@ -231,14 +226,12 @@ internal class DatabaseImpl(
             iParser.parseResource(it.serializedResource) as Resource,
           )
         }
-    }
   }
 
   override suspend fun searchReverseReferencedResources(
     query: SearchQuery,
   ): List<ReverseIncludeSearchResult> {
-    return db.withTransaction {
-      resourceDao
+    return resourceDao
         .getReverseReferencedResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
         .map {
           ReverseIncludeSearchResult(
@@ -247,13 +240,11 @@ internal class DatabaseImpl(
             iParser.parseResource(it.serializedResource) as Resource,
           )
         }
-    }
   }
 
   override suspend fun count(query: SearchQuery): Long {
-    return db.withTransaction {
-      resourceDao.countResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
-    }
+    return resourceDao.countResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
+
   }
 
   override suspend fun getAllLocalChanges(): List<LocalChange> {
