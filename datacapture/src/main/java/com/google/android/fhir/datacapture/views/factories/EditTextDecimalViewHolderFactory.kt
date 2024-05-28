@@ -16,7 +16,6 @@
 
 package com.google.android.fhir.datacapture.views.factories
 
-import android.text.Editable
 import android.text.InputType
 import com.google.android.fhir.datacapture.R
 import com.google.android.fhir.datacapture.views.QuestionnaireViewItem
@@ -30,17 +29,21 @@ internal object EditTextDecimalViewHolderFactory :
 
   override fun getQuestionnaireItemViewHolderDelegate() =
     object : QuestionnaireItemEditTextViewHolderDelegate(DECIMAL_INPUT_TYPE) {
-      override suspend fun handleInput(
-        editable: Editable,
+      override suspend fun handleInputText(
+        input: String?,
         questionnaireViewItem: QuestionnaireViewItem,
       ) {
-        editable.toString().toDoubleOrNull()?.let {
+        if (input.isNullOrEmpty()) {
+          questionnaireViewItem.clearAnswer()
+          return
+        }
+        input.toDoubleOrNull()?.let {
           questionnaireViewItem.setAnswer(
             QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent()
               .setValue(DecimalType(it.toString())),
           )
         }
-          ?: questionnaireViewItem.setDraftAnswer(editable.toString())
+          ?: questionnaireViewItem.setDraftAnswer(input)
       }
 
       override fun updateUI(
