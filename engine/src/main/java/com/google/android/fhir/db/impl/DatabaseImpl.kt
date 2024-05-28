@@ -37,6 +37,9 @@ import com.google.android.fhir.index.ResourceIndexer
 import com.google.android.fhir.logicalId
 import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.toLocalChange
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.time.Instant
 import java.util.UUID
 import org.hl7.fhir.r4.model.Resource
@@ -210,8 +213,11 @@ internal class DatabaseImpl(
   ): List<ResourceWithUUID<R>> {
     return resourceDao
         .getResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
-        .map { ResourceWithUUID(it.uuid, iParser.parseResource(it.serializedResource) as R) }
+        .pmap { ResourceWithUUID(it.uuid, iParser.parseResource(it.serializedResource) as R) }
         .distinctBy { it.uuid }
+  }
+  suspend fun <A, B> Iterable<A>.pmap(f: suspend (A) -> B): List<B> = coroutineScope {
+    map { async { f(it) } }.awaitAll()
   }
 
   override suspend fun searchForwardReferencedResources(
