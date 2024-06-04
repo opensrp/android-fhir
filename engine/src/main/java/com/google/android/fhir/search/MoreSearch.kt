@@ -77,7 +77,7 @@ internal suspend fun <R : Resource> Search.execute(database: Database): List<Sea
     }
 
   val searchResults: List<SearchResult<R>>
-  val transformSearchResultTimeInMillis = measureTimeMillis {
+//  val transformSearchResultTimeInMillis = measureTimeMillis {
     searchResults = baseResources.map { (uuid, baseResource) ->
       SearchResult(
         baseResource,
@@ -95,8 +95,8 @@ internal suspend fun <R : Resource> Search.execute(database: Database): List<Sea
           ?.groupBy({ it.resource.resourceType to it.searchIndex }, { it.resource }),
       )
     }
-  }
-  Timber.e("Transform resources to SearchResult for ${baseResources.firstOrNull()?.resource?.resourceType} with ${baseResources.size} baseResources, ${includedResources?.size ?: 0} includedResources and ${revIncludedResources?.size ?:0} revIncluded resources took ${transformSearchResultTimeInMillis}ms")
+//  }
+//  Timber.e("Transform resources to SearchResult for ${baseResources.firstOrNull()?.resource?.resourceType} with ${baseResources.size} baseResources, ${includedResources?.size ?: 0} includedResources and ${revIncludedResources?.size ?:0} revIncluded resources took ${transformSearchResultTimeInMillis}ms")
   return searchResults
 }
 

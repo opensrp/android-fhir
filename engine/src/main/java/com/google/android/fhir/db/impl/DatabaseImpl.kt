@@ -32,14 +32,17 @@ import com.google.android.fhir.db.ResourceWithUUID
 import com.google.android.fhir.db.impl.DatabaseImpl.Companion.UNENCRYPTED_DATABASE_NAME
 import com.google.android.fhir.db.impl.dao.ForwardIncludeSearchResult
 import com.google.android.fhir.db.impl.dao.ReverseIncludeSearchResult
+import com.google.android.fhir.db.impl.dao.SerializedResourceWithUuid
 import com.google.android.fhir.db.impl.entities.ResourceEntity
 import com.google.android.fhir.index.ResourceIndexer
 import com.google.android.fhir.logicalId
 import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.toLocalChange
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.util.UUID
 import org.hl7.fhir.r4.model.Resource
@@ -216,7 +219,7 @@ internal class DatabaseImpl(
         .pmap { ResourceWithUUID(it.uuid, iParser.parseResource(it.serializedResource) as R) }
         .distinctBy { it.uuid }
   }
-  suspend fun <A, B> Iterable<A>.pmap(f: suspend (A) -> B): List<B> = coroutineScope {
+  private suspend fun <A, B> Iterable<A>.pmap(f: suspend (A) -> B): List<B> = coroutineScope {
     map { async { f(it) } }.awaitAll()
   }
 
