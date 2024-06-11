@@ -32,11 +32,9 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import com.google.android.fhir.datacapture.R
 import com.google.android.fhir.datacapture.extensions.getRequiredOrOptionalText
-import com.google.android.fhir.datacapture.extensions.getValidationErrorMessage
 import com.google.android.fhir.datacapture.extensions.localizedFlyoverSpanned
 import com.google.android.fhir.datacapture.extensions.tryUnwrapContext
 import com.google.android.fhir.datacapture.extensions.unit
-import com.google.android.fhir.datacapture.validation.ValidationResult
 import com.google.android.fhir.datacapture.views.HeaderView
 import com.google.android.fhir.datacapture.views.QuestionnaireViewItem
 import com.google.android.material.textfield.TextInputEditText
@@ -74,7 +72,7 @@ abstract class QuestionnaireItemEditTextViewHolderDelegate(private val rawInputT
     // https://stackoverflow.com/questions/13614101/fatal-crash-focus-search-returned-a-view-that-wasnt-able-to-take-focus/47991577
     textInputEditText.setOnEditorActionListener { view, actionId, _ ->
       if (actionId != EditorInfo.IME_ACTION_NEXT) {
-        false
+        return@setOnEditorActionListener false
       }
       view.focusSearch(FOCUS_DOWN)?.requestFocus(FOCUS_DOWN) ?: false
     }
@@ -99,25 +97,32 @@ abstract class QuestionnaireItemEditTextViewHolderDelegate(private val rawInputT
       hint = questionnaireViewItem.enabledDisplayItems.localizedFlyoverSpanned
       helperText = getRequiredOrOptionalText(questionnaireViewItem, context)
     }
-    displayValidationResult(questionnaireViewItem.validationResult)
 
-    textInputEditText.removeTextChangedListener(textWatcher)
-    updateUI(questionnaireViewItem, textInputEditText, textInputLayout)
+    // Validation is updated everytime the view is bound
+    updateValidationTextUI(questionnaireViewItem)
 
-    unitTextView?.apply {
-      text = questionnaireViewItem.questionnaireItem.unit?.code
-      visibility = if (text.isNullOrEmpty()) GONE else VISIBLE
-    }
+    /**
+     * We should only update an EditText programmatically when its not in focus. Following should
+     * and does work for 2 scenarios:-
+     * 1. When user scrolls to a new question and same ViewHolder is utilised by the RecyclerView,
+     *    the EditText content should be updated for that [QuestionnaireViewItem]
+     * 2. When the current item is readOnly, then it's value may get updated by expressions.
+     */
+    if (!textInputEditText.isFocused) {
+      textInputEditText.removeTextChangedListener(textWatcher)
+      updateInputTextUI(questionnaireViewItem, textInputEditText, textInputLayout)
 
-    textWatcher =
-      textInputEditText.doAfterTextChanged { editable: Editable? ->
-        context.lifecycleScope.launch { handleInput(editable!!, questionnaireViewItem) }
+      unitTextView?.apply {
+        text = questionnaireViewItem.questionnaireItem.unit?.code
+        visibility = if (text.isNullOrEmpty()) GONE else VISIBLE
       }
-  }
 
-  private fun displayValidationResult(validationResult: ValidationResult) {
-    textInputLayout.error =
-      getValidationErrorMessage(textInputLayout.context, questionnaireViewItem, validationResult)
+      // TextWatcher is set only once for each question item in scenario 1
+      textWatcher =
+        textInputEditText.doAfterTextChanged { editable: Editable? ->
+          context.lifecycleScope.launch { handleInput(editable!!, questionnaireViewItem) }
+        }
+    }
   }
 
   override fun setReadOnly(isReadOnly: Boolean) {
@@ -129,9 +134,11 @@ abstract class QuestionnaireItemEditTextViewHolderDelegate(private val rawInputT
   abstract suspend fun handleInput(editable: Editable, questionnaireViewItem: QuestionnaireViewItem)
 
   /** Handles the UI update. */
-  abstract fun updateUI(
+  abstract fun updateInputTextUI(
     questionnaireViewItem: QuestionnaireViewItem,
     textInputEditText: TextInputEditText,
     textInputLayout: TextInputLayout,
   )
+
+  abstract fun updateValidationTextUI(questionnaireViewItem: QuestionnaireViewItem)
 }
