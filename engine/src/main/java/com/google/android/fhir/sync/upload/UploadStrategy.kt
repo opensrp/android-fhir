@@ -123,7 +123,7 @@ private constructor(
    * Not yet implemented - Fetches all changes for a single resource, generates a patch for that
    * resource, and creates a single PUT request with the patch.
    */
-  private object SingleResourcePut :
+  data object SingleResourcePut :
     UploadStrategy(
       LocalChangesFetchMode.PerResource,
       PatchGeneratorMode.PerResource,
