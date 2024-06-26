@@ -32,22 +32,18 @@ import com.google.android.fhir.db.ResourceWithUUID
 import com.google.android.fhir.db.impl.DatabaseImpl.Companion.UNENCRYPTED_DATABASE_NAME
 import com.google.android.fhir.db.impl.dao.ForwardIncludeSearchResult
 import com.google.android.fhir.db.impl.dao.ReverseIncludeSearchResult
-import com.google.android.fhir.db.impl.dao.SerializedResourceWithUuid
 import com.google.android.fhir.db.impl.entities.ResourceEntity
 import com.google.android.fhir.index.ResourceIndexer
 import com.google.android.fhir.logicalId
 import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.toLocalChange
-import kotlinx.coroutines.Dispatchers
+import java.time.Instant
+import java.util.UUID
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
-import java.time.Instant
-import java.util.UUID
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
-import java.util.Collections
 
 /**
  * The implementation for the persistence layer using Room. See docs for
@@ -150,7 +146,9 @@ internal class DatabaseImpl(
   }
 
   override suspend fun <R : Resource> insertLocalOnly(vararg resource: R): List<String> {
-    return db.withTransaction { resourceDao.insertAllRemote(resource.toList()).map { it.toString() }.toList() }
+    return db.withTransaction {
+      resourceDao.insertAllRemote(resource.toList()).map { it.toString() }.toList()
+    }
   }
 
   override suspend fun <R : Resource> insertRemote(vararg resource: R) {
@@ -186,7 +184,6 @@ internal class DatabaseImpl(
 
   override suspend fun select(type: ResourceType, id: String): Resource {
     return resourceDao.getResource(resourceId = id, resourceType = type)?.let {
-
       iParser.parseResource(it) as Resource
     }
       ?: throw ResourceNotFoundException(type.name, id)
@@ -216,10 +213,11 @@ internal class DatabaseImpl(
     query: SearchQuery,
   ): List<ResourceWithUUID<R>> {
     return resourceDao
-        .getResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
-        .pmap { ResourceWithUUID(it.uuid, iParser.parseResource(it.serializedResource) as R) }
-        .distinctBy { it.uuid }
+      .getResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
+      .pmap { ResourceWithUUID(it.uuid, iParser.parseResource(it.serializedResource) as R) }
+      .distinctBy { it.uuid }
   }
+
   private suspend fun <A, B> Iterable<A>.pmap(f: suspend (A) -> B): List<B> = coroutineScope {
     map { async { f(it) } }.awaitAll()
   }
@@ -228,33 +226,32 @@ internal class DatabaseImpl(
     query: SearchQuery,
   ): List<ForwardIncludeSearchResult> {
     return resourceDao
-        .getForwardReferencedResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
-        .map {
-          ForwardIncludeSearchResult(
-            it.matchingIndex,
-            it.baseResourceUUID,
-            iParser.parseResource(it.serializedResource) as Resource,
-          )
-        }
+      .getForwardReferencedResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
+      .map {
+        ForwardIncludeSearchResult(
+          it.matchingIndex,
+          it.baseResourceUUID,
+          iParser.parseResource(it.serializedResource) as Resource,
+        )
+      }
   }
 
   override suspend fun searchReverseReferencedResources(
     query: SearchQuery,
   ): List<ReverseIncludeSearchResult> {
     return resourceDao
-        .getReverseReferencedResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
-        .map {
-          ReverseIncludeSearchResult(
-            it.matchingIndex,
-            it.baseResourceTypeAndId,
-            iParser.parseResource(it.serializedResource) as Resource,
-          )
-        }
+      .getReverseReferencedResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
+      .map {
+        ReverseIncludeSearchResult(
+          it.matchingIndex,
+          it.baseResourceTypeAndId,
+          iParser.parseResource(it.serializedResource) as Resource,
+        )
+      }
   }
 
   override suspend fun count(query: SearchQuery): Long {
     return resourceDao.countResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
-
   }
 
   override suspend fun getAllLocalChanges(): List<LocalChange> {
