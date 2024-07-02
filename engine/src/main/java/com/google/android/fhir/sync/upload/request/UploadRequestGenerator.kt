@@ -62,7 +62,7 @@ internal object UploadRequestGeneratorFactory {
           mode.httpVerbToUseForCreate,
           mode.httpVerbToUseForUpdate,
           mode.bundleSize,
-          useETagForUpload = false
+          useETagForUpload = false,
         )
     }
 }

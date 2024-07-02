@@ -39,9 +39,11 @@ import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.toLocalChange
 import java.time.Instant
 import java.util.UUID
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
-import java.util.Collections
 
 /**
  * The implementation for the persistence layer using Room. See docs for
@@ -144,7 +146,9 @@ internal class DatabaseImpl(
   }
 
   override suspend fun <R : Resource> insertLocalOnly(vararg resource: R): List<String> {
-    return db.withTransaction { resourceDao.insertAllRemote(resource.toList()).map { it.toString() }.toList() }
+    return db.withTransaction {
+      resourceDao.insertAllRemote(resource.toList()).map { it.toString() }.toList()
+    }
   }
 
   override suspend fun <R : Resource> insertRemote(vararg resource: R) {
@@ -211,9 +215,13 @@ internal class DatabaseImpl(
     return db.withTransaction {
       resourceDao
         .getResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
-        .map { ResourceWithUUID(it.uuid, iParser.parseResource(it.serializedResource) as R) }
+        .pmap { ResourceWithUUID(it.uuid, iParser.parseResource(it.serializedResource) as R) }
         .distinctBy { it.uuid }
     }
+  }
+
+  private suspend fun <A, B> Iterable<A>.pmap(f: suspend (A) -> B): List<B> = coroutineScope {
+    map { async { f(it) } }.awaitAll()
   }
 
   override suspend fun searchForwardReferencedResources(
