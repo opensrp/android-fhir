@@ -140,7 +140,7 @@ object Dependencies {
   object Versions {
 
     object Cql {
-      const val clinicalReasoning = "3.0.0-PRE9-SNAPSHOT"
+      const val clinicalReasoning = "3.0.0-PRE9"
     }
 
     const val androidFhirCommon = "0.1.0-alpha05-preview3-SNAPSHOT"
