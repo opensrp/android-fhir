@@ -61,8 +61,7 @@ internal object UploadRequestGeneratorFactory {
         TransactionBundleGenerator.getGenerator(
           mode.httpVerbToUseForCreate,
           mode.httpVerbToUseForUpdate,
-          mode.bundleSize,
-          useETagForUpload = false
+          mode.bundleSize
         )
     }
 }
