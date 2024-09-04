@@ -38,6 +38,9 @@ import com.google.android.fhir.index.ResourceIndexer
 import com.google.android.fhir.logicalId
 import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.toLocalChange
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.time.Instant
 import java.util.UUID
 import org.hl7.fhir.r4.model.Resource
@@ -210,7 +213,7 @@ internal class DatabaseImpl(
     query: SearchQuery,
   ): List<ResourceWithUUID<R>> {
     return db.withTransaction {
-      resourceDao.getResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray())).map {
+      resourceDao.getResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray())).pmap {
         ResourceWithUUID(it.uuid, iParser.parseResource(it.serializedResource) as R)
       }
     }
@@ -222,7 +225,7 @@ internal class DatabaseImpl(
     return db.withTransaction {
       resourceDao
         .getForwardReferencedResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
-        .map {
+        .pmap {
           ForwardIncludeSearchResult(
             it.matchingIndex,
             it.baseResourceUUID,
@@ -238,7 +241,7 @@ internal class DatabaseImpl(
     return db.withTransaction {
       resourceDao
         .getReverseReferencedResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray()))
-        .map {
+        .pmap {
           ReverseIncludeSearchResult(
             it.matchingIndex,
             it.baseResourceTypeAndId,
@@ -416,6 +419,13 @@ internal class DatabaseImpl(
         )
       }
     }
+  }
+
+  /**
+   * Implementation of a parallelized map
+   */
+  suspend fun <A, B> Iterable<A>.pmap(f: suspend (A) -> B): List<B> = coroutineScope {
+    map { async { f(it) } }.awaitAll()
   }
 
   companion object {
