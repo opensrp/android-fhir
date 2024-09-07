@@ -40,7 +40,7 @@ import org.opencds.cqf.fhir.cql.LibraryEngine
 import org.opencds.cqf.fhir.cr.measure.MeasureEvaluationOptions
 import org.opencds.cqf.fhir.cr.measure.common.MeasureReportType
 import org.opencds.cqf.fhir.cr.measure.r4.R4MeasureProcessor
-import org.opencds.cqf.fhir.cr.plandefinition.r4.PlanDefinitionProcessor
+import org.opencds.cqf.fhir.cr.plandefinition.PlanDefinitionProcessor
 import org.opencds.cqf.fhir.utility.monad.Eithers
 import org.opencds.cqf.fhir.utility.repository.ProxyRepository
 
