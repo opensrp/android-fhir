@@ -176,12 +176,12 @@ internal constructor(
         null
       }
 
-    val subjectIds = listOf(subject)
+    val subjectIds = if (subject == null) listOf() else listOf(subject)
 
     val evalType =
       MeasureEvalType.fromCode(reportType)
         .orElse(
-          if (subjectIds.isNotEmpty() && subjectIds[0] != null) {
+          if (subjectIds.isNotEmpty()) {
             MeasureEvalType.SUBJECT
           } else {
             MeasureEvalType.POPULATION
