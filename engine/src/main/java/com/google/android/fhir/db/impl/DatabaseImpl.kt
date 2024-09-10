@@ -37,6 +37,7 @@ import com.google.android.fhir.db.impl.entities.LocalChangeEntity
 import com.google.android.fhir.db.impl.entities.ResourceEntity
 import com.google.android.fhir.index.ResourceIndexer
 import com.google.android.fhir.logicalId
+import com.google.android.fhir.pmap
 import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.toLocalChange
 import com.google.android.fhir.updateMeta
