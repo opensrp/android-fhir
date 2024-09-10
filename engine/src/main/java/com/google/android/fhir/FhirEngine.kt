@@ -168,9 +168,12 @@ interface CrudFhirEngine {
    * returned list of IDs.
    *
    * @param resource The FHIR resources to create.
+   * @param isLocalOnly - Setting the value to [true] instructs engine that the resource and its
+   *   subsequent updates should never be synced to the server.
    * @return A list of logical IDs of the newly created resources.
    */
-  suspend fun create(vararg resource: Resource): List<String>
+
+  suspend fun create(vararg resource: Resource, isLocalOnly: Boolean = false): List<String>
 
   /**
    * Loads a FHIR resource given its [ResourceType] and logical ID.
