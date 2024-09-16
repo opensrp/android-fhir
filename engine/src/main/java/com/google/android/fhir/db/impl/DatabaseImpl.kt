@@ -21,6 +21,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.room.Room
 import androidx.room.withTransaction
 import androidx.sqlite.db.SimpleSQLiteQuery
+import ca.uhn.fhir.context.FhirContext
 import ca.uhn.fhir.parser.IParser
 import ca.uhn.fhir.util.FhirTerser
 import com.google.android.fhir.DatabaseErrorStrategy
@@ -37,10 +38,10 @@ import com.google.android.fhir.db.impl.entities.LocalChangeEntity
 import com.google.android.fhir.db.impl.entities.ResourceEntity
 import com.google.android.fhir.index.ResourceIndexer
 import com.google.android.fhir.logicalId
-import com.google.android.fhir.pmap
 import com.google.android.fhir.search.SearchQuery
 import com.google.android.fhir.toLocalChange
 import com.google.android.fhir.updateMeta
+import kotlinx.coroutines.Dispatchers
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.async
@@ -49,7 +50,6 @@ import kotlinx.coroutines.coroutineScope
 import org.hl7.fhir.r4.model.IdType
 import org.hl7.fhir.r4.model.Resource
 import org.hl7.fhir.r4.model.ResourceType
-import java.util.Collections
 
 /**
  * The implementation for the persistence layer using Room. See docs for
@@ -237,7 +237,7 @@ internal class DatabaseImpl(
   ): List<ResourceWithUUID<R>> {
     return db.withTransaction {
       resourceDao.getResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray())).pmap {
-        ResourceWithUUID(it.uuid, iParser.parseResource(it.serializedResource) as R)
+        ResourceWithUUID(it.uuid, FhirContext.forR4Cached().newJsonParser().parseResource(it.serializedResource) as R)
       }
     }
   }
@@ -252,7 +252,7 @@ internal class DatabaseImpl(
           ForwardIncludeSearchResult(
             it.matchingIndex,
             it.baseResourceUUID,
-            iParser.parseResource(it.serializedResource) as Resource,
+            FhirContext.forR4Cached().newJsonParser().parseResource(it.serializedResource) as Resource,
           )
         }
     }
@@ -268,7 +268,7 @@ internal class DatabaseImpl(
           ReverseIncludeSearchResult(
             it.matchingIndex,
             it.baseResourceTypeAndId,
-            iParser.parseResource(it.serializedResource) as Resource,
+            FhirContext.forR4Cached().newJsonParser().parseResource(it.serializedResource) as Resource,
           )
         }
     }
@@ -450,7 +450,7 @@ internal class DatabaseImpl(
 
   /** Implementation of a parallelized map */
   suspend fun <A, B> Iterable<A>.pmap(f: suspend (A) -> B): List<B> = coroutineScope {
-    map { async { f(it) } }.awaitAll()
+    map { async(Dispatchers.Default) { f(it) } }.awaitAll()
   }
 
   companion object {
