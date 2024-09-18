@@ -237,7 +237,10 @@ internal class DatabaseImpl(
   ): List<ResourceWithUUID<R>> {
     return db.withTransaction {
       resourceDao.getResources(SimpleSQLiteQuery(query.query, query.args.toTypedArray())).pmap {
-        ResourceWithUUID(it.uuid, FhirContext.forR4Cached().newJsonParser().parseResource(it.serializedResource) as R)
+        ResourceWithUUID(
+          it.uuid,
+          FhirContext.forR4Cached().newJsonParser().parseResource(it.serializedResource) as R,
+        )
       }
     }
   }
@@ -252,7 +255,8 @@ internal class DatabaseImpl(
           ForwardIncludeSearchResult(
             it.matchingIndex,
             it.baseResourceUUID,
-            FhirContext.forR4Cached().newJsonParser().parseResource(it.serializedResource) as Resource,
+            FhirContext.forR4Cached().newJsonParser().parseResource(it.serializedResource)
+              as Resource,
           )
         }
     }
@@ -268,7 +272,8 @@ internal class DatabaseImpl(
           ReverseIncludeSearchResult(
             it.matchingIndex,
             it.baseResourceTypeAndId,
-            FhirContext.forR4Cached().newJsonParser().parseResource(it.serializedResource) as Resource,
+            FhirContext.forR4Cached().newJsonParser().parseResource(it.serializedResource)
+              as Resource,
           )
         }
     }
@@ -472,6 +477,11 @@ internal class DatabaseImpl(
 
     @VisibleForTesting const val DATABASE_PASSPHRASE_NAME = "fhirEngineDbPassphrase"
   }
+}
+
+/** Implementation of a parallelized map */
+suspend fun <A, B> Iterable<A>.pmap(f: suspend (A) -> B): List<B> = coroutineScope {
+  map { async(Dispatchers.Default) { f(it) } }.awaitAll()
 }
 
 internal data class DatabaseConfig(
