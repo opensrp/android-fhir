@@ -143,9 +143,9 @@ object Dependencies {
       const val clinicalReasoning = "3.0.0-PRE9"
     }
 
-    const val androidFhirCommon = "0.1.0-alpha05-preview3-SNAPSHOT"
-    const val androidFhirEngine = "1.0.0-preview11-SNAPSHOT"
-    const val androidFhirKnowledge = "0.1.0-alpha03-preview5-SNAPSHOT"
+    const val androidFhirCommon = "0.1.0-alpha05-preview3-rc1-SNAPSHOT"
+    const val androidFhirEngine = "1.0.0-preview14-rc1-SNAPSHOT"
+    const val androidFhirKnowledge = "0.1.0-alpha03-preview5-rc1-SNAPSHOT"
     const val apacheCommonsCompress = "1.21"
     const val desugarJdkLibs = "2.0.3"
     const val caffeine = "2.9.1"
