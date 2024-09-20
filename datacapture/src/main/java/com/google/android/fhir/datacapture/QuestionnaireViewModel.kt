@@ -79,6 +79,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.Questionnaire.QuestionnaireItemComponent
 import org.hl7.fhir.r4.model.QuestionnaireResponse
@@ -623,7 +624,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       }
       .map { it.value }
       .stateIn(
-        viewModelScope,
+        viewModelScope + Dispatchers.IO,
         SharingStarted.Lazily,
         initialValue =
           QuestionnaireState(
@@ -723,7 +724,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       questionnaireResponseItem.answer.filterNot { ans ->
         disabledAnswers.any { ans.value.equalsDeep(it.value) }
       }
-    viewModelScope.launch {
+    viewModelScope.launch(Dispatchers.IO) {
       answersChangedCallback(questionnaireItem, questionnaireResponseItem, validAnswers, null)
     }
   }
@@ -1066,7 +1067,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
             add(
               QuestionnaireAdapterItem.RepeatedGroupHeader(
                 index = index,
-                onDeleteClicked = { viewModelScope.launch { question.item.removeAnswerAt(index) } },
+                onDeleteClicked = { viewModelScope.launch(Dispatchers.IO) { question.item.removeAnswerAt(index) } },
                 responses = nestedResponseItemList,
                 title = question.item.questionText?.toString() ?: "",
               ),
