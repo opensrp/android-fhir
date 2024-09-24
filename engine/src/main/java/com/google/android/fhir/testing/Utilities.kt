@@ -199,6 +199,8 @@ internal object TestFhirEngineImpl : FhirEngine {
     )
   }
 
+  override suspend fun getUnsyncedLocalChanges(): List<LocalChange> = listOf()
+
   override suspend fun purge(type: ResourceType, id: String, forcePurge: Boolean) {}
 
   override suspend fun purge(type: ResourceType, ids: Set<String>, forcePurge: Boolean) {}
