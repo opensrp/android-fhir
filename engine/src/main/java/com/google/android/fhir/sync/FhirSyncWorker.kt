@@ -159,10 +159,10 @@ abstract class FhirSyncWorker(appContext: Context, workerParams: WorkerParameter
   }
 
   open fun onFailedSyncJobResult(failedSyncJobStatus: SyncJobStatus.Failed) {
-    try {
-      val jsonParser = FhirContext.forR4().newJsonParser()
-      val exceptions = (failedSyncJobStatus).exceptions
+    val jsonParser = FhirContext.forR4().newJsonParser()
+    val exceptions = (failedSyncJobStatus).exceptions
 
+    try {
       exceptions.forEach { resourceSyncException ->
         val operationOutcome =
           jsonParser.parseResource(
@@ -183,6 +183,7 @@ abstract class FhirSyncWorker(appContext: Context, workerParams: WorkerParameter
       }
     } catch (e: Exception) {
       Timber.e(e)
+      exceptions?.forEach { Timber.e(it.exception.message) }
     }
   }
 
