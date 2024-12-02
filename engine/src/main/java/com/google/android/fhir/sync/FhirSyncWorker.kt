@@ -164,21 +164,22 @@ abstract class FhirSyncWorker(appContext: Context, workerParams: WorkerParameter
 
     try {
       exceptions.forEach { resourceSyncException ->
-        val operationOutcome =
-          jsonParser.parseResource(
-            IOUtils.toString(
-              (resourceSyncException.exception as HttpException)
-                .response()
-                ?.errorBody()
-                ?.byteStream(),
-              StandardCharsets.UTF_8,
-            ),
-          ) as OperationOutcome
+        if (resourceSyncException.exception is HttpException) {
+          val operationOutcome =
+            jsonParser.parseResource(
+              IOUtils.toString(
+                resourceSyncException.exception.response()?.errorBody()?.byteStream(),
+                StandardCharsets.UTF_8,
+              ),
+            ) as OperationOutcome
 
-        operationOutcome.issue.forEach { operationOutcomeIssueComponent ->
-          Timber.e(
-            "SERVER ${operationOutcomeIssueComponent.severity} - HTTP ${resourceSyncException.exception.code()} | Code - ${operationOutcomeIssueComponent.code} | Diagnostics - ${operationOutcomeIssueComponent.diagnostics}",
-          )
+          operationOutcome.issue.forEach { operationOutcomeIssueComponent ->
+            Timber.e(
+              "SERVER ${operationOutcomeIssueComponent.severity} - HTTP ${resourceSyncException.exception.code()} | Code - ${operationOutcomeIssueComponent.code} | Diagnostics - ${operationOutcomeIssueComponent.diagnostics}",
+            )
+          }
+        } else {
+          Timber.e(resourceSyncException.exception)
         }
       }
     } catch (e: Exception) {
