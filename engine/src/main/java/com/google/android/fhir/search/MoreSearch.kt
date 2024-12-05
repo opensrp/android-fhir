@@ -147,8 +147,8 @@ internal fun Search.getRevIncludeQuery(includeIds: List<String>): SearchQuery {
       val filterQuery = generateFilterQuery(it)
       """
       SELECT rie.index_name, rie.index_value, re.serializedResource
-      FROM ResourceEntity re
-      JOIN ReferenceIndexEntity rie
+      FROM ReferenceIndexEntity rie
+      JOIN ResourceEntity re
       ON re.resourceUuid = rie.resourceUuid
       ${join.query}
       WHERE rie.resourceType = ?  AND rie.index_name = ?  AND rie.index_value IN ($uuidsString)
@@ -210,8 +210,8 @@ internal fun Search.getIncludeQuery(includeIds: List<UUID>): SearchQuery {
       val filterQuery = generateFilterQuery(it)
       """
       SELECT rie.index_name, rie.resourceUuid, re.serializedResource
-      FROM ResourceEntity re
-      JOIN ReferenceIndexEntity rie
+      FROM ReferenceIndexEntity rie
+      JOIN ResourceEntity re
       ON re.resourceType||"/"||re.resourceId = rie.index_value
       ${join.query}
       WHERE rie.resourceType = ?  AND rie.index_name = ?  AND rie.resourceUuid IN ($uuidsString)
