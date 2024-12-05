@@ -46,7 +46,7 @@ class ResourceParamsBasedDownloadWorkManager(
 
   override suspend fun getNextRequest(): DownloadRequest? {
     if (urlOfTheNextPagesToDownloadForAResource.isNotEmpty()) {
-      return urlOfTheNextPagesToDownloadForAResource.poll()?.let { DownloadRequest.of(it) }
+      return urlOfTheNextPagesToDownloadForAResource.poll()?.let { DownloadRequest.of(it.replace("_pretty=true","_pretty=false")) }
     }
 
     return resourcesToDownloadWithSearchParams.poll()?.let { (resourceType, params) ->
