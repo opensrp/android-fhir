@@ -81,7 +81,7 @@ object Releases {
 
   object Knowledge : LibraryArtifact {
     override val artifactId = "knowledge"
-    override val version = "0.1.0-alpha03-preview5-rc1-SNAPSHOT"
+    override val version = "0.1.0-alpha03-preview5-rc2-SNAPSHOT"
     override val name = "Android FHIR Knowledge Manager Library"
   }
 

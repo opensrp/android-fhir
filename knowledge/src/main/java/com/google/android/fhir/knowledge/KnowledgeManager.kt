@@ -19,7 +19,6 @@ package com.google.android.fhir.knowledge
 import android.content.Context
 import androidx.room.Room
 import ca.uhn.fhir.context.FhirContext
-import ca.uhn.fhir.parser.IParser
 import com.google.android.fhir.knowledge.db.KnowledgeDatabase
 import com.google.android.fhir.knowledge.db.entities.ResourceMetadataEntity
 import com.google.android.fhir.knowledge.db.entities.toEntity
@@ -55,7 +54,6 @@ internal constructor(
   knowledgeDatabase: KnowledgeDatabase,
   private val npmFileManager: NpmFileManager,
   private val npmPackageDownloader: NpmPackageDownloader,
-  private val jsonParser: IParser = FhirContext.forR4().newJsonParser(),
 ) {
   private val knowledgeDao = knowledgeDatabase.knowledgeDao()
 
@@ -98,6 +96,7 @@ internal constructor(
     val igId = knowledgeDao.insert(fhirNpmPackage.toEntity(rootDirectory))
     rootDirectory.listFiles()?.forEach { file ->
       try {
+        val jsonParser = FhirContext.forR4Cached().newJsonParser()
         val resource = jsonParser.parseResource(FileInputStream(file))
         if (resource is Resource) {
           val newId = indexResourceFile(igId, resource, file)
@@ -159,7 +158,7 @@ internal constructor(
     val resource =
       withContext(Dispatchers.IO) {
         try {
-          FileInputStream(file).use(jsonParser::parseResource)
+          FileInputStream(file).use(FhirContext.forR4Cached().newJsonParser()::parseResource)
         } catch (exception: Exception) {
           Timber.d(exception, "Unable to import file: $file. Parsing to FhirResource failed.")
         }
@@ -171,7 +170,12 @@ internal constructor(
 
         // Overrides the Id in the file
         FileOutputStream(file).use {
-          it.write(jsonParser.encodeResourceToString(resource).toByteArray())
+          it.write(
+            FhirContext.forR4Cached()
+              .newJsonParser()
+              .encodeResourceToString(resource)
+              .toByteArray(),
+          )
         }
       }
     }
@@ -221,7 +225,9 @@ internal constructor(
   }
 
   private fun loadResource(resourceEntity: ResourceMetadataEntity): IBaseResource {
-    return jsonParser.parseResource(FileInputStream(resourceEntity.resourceFile))
+    return FhirContext.forR4Cached()
+      .newJsonParser()
+      .parseResource(FileInputStream(resourceEntity.resourceFile))
   }
 
   companion object {
