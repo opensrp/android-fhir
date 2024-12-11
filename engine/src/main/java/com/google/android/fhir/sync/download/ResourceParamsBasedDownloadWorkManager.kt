@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google LLC
+ * Copyright 2023-2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,9 @@ class ResourceParamsBasedDownloadWorkManager(
 
   override suspend fun getNextRequest(): DownloadRequest? {
     if (urlOfTheNextPagesToDownloadForAResource.isNotEmpty()) {
-      return urlOfTheNextPagesToDownloadForAResource.poll()?.let { DownloadRequest.of(it.replace("_pretty=true","_pretty=false")) }
+      return urlOfTheNextPagesToDownloadForAResource.poll()?.let {
+        DownloadRequest.of(it.replace("_pretty=true", "_pretty=false"))
+      }
     }
 
     return resourcesToDownloadWithSearchParams.poll()?.let { (resourceType, params) ->

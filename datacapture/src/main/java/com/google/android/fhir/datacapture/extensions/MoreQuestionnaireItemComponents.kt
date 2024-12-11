@@ -980,7 +980,7 @@ internal fun QuestionnaireItemComponent.createQuestionnaireResponseItem():
       this@createQuestionnaireResponseItem.type == Questionnaire.QuestionnaireItemType.GROUP
     ) {
       this@createQuestionnaireResponseItem.item.forEach {
-          this.addItem(it.createQuestionnaireResponseItem())
+        this.addItem(it.createQuestionnaireResponseItem())
       }
     }
   }
