@@ -138,38 +138,38 @@ internal abstract class ResourceDao {
   }
 
   suspend fun insertAllRemote(resources: List<Resource>): List<UUID> {
-    return resources.map { resource -> insertRemoteResource(resource) }
+    return insertRemoteResource(*resources.toTypedArray())
   }
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
-  abstract suspend fun insertResource(resource: ResourceEntity)
+  abstract suspend fun insertResource(vararg resource: ResourceEntity)
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
-  abstract suspend fun insertStringIndex(stringIndexEntity: StringIndexEntity)
+  abstract suspend fun insertStringIndex(vararg stringIndexEntity: StringIndexEntity)
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
-  abstract suspend fun insertReferenceIndex(referenceIndexEntity: ReferenceIndexEntity)
+  abstract suspend fun insertReferenceIndex(vararg referenceIndexEntity: ReferenceIndexEntity)
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
-  abstract suspend fun insertCodeIndex(tokenIndexEntity: TokenIndexEntity)
+  abstract suspend fun insertCodeIndex(vararg tokenIndexEntity: TokenIndexEntity)
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
-  abstract suspend fun insertQuantityIndex(quantityIndexEntity: QuantityIndexEntity)
+  abstract suspend fun insertQuantityIndex(vararg quantityIndexEntity: QuantityIndexEntity)
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
-  abstract suspend fun insertUriIndex(uriIndexEntity: UriIndexEntity)
+  abstract suspend fun insertUriIndex(vararg uriIndexEntity: UriIndexEntity)
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
-  abstract suspend fun insertDateIndex(dateIndexEntity: DateIndexEntity)
+  abstract suspend fun insertDateIndex(vararg dateIndexEntity: DateIndexEntity)
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
-  abstract suspend fun insertDateTimeIndex(dateTimeIndexEntity: DateTimeIndexEntity)
+  abstract suspend fun insertDateTimeIndex(vararg dateTimeIndexEntity: DateTimeIndexEntity)
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
-  abstract suspend fun insertNumberIndex(numberIndexEntity: NumberIndexEntity)
+  abstract suspend fun insertNumberIndex(vararg numberIndexEntity: NumberIndexEntity)
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
-  abstract suspend fun insertPositionIndex(positionIndexEntity: PositionIndexEntity)
+  abstract suspend fun insertPositionIndex(vararg positionIndexEntity: PositionIndexEntity)
 
   @Query(
     """
@@ -241,56 +241,196 @@ internal abstract class ResourceDao {
   @RawQuery abstract suspend fun countResources(query: SupportSQLiteQuery): Long
 
   suspend fun insertLocalResource(resource: Resource, timeOfChange: Instant) =
-    insertResource(resource, timeOfChange)
+    insertResource(resource, lastUpdatedLocal = timeOfChange).single()
 
   // Check if the resource already exists using its logical ID, if it does, we just update the
   // existing [ResourceEntity]
   // Else, we insert with a new [ResourceEntity]
-  private suspend fun insertRemoteResource(resource: Resource): UUID {
-    val existingResourceEntity = getResourceEntity(resource.logicalId, resource.resourceType)
-    if (existingResourceEntity != null) {
-      applyRemoteUpdate(resource)
-      return existingResourceEntity.resourceUuid
-    }
-    return insertResource(resource, null)
+  private suspend fun insertRemoteResource(vararg resources: Resource): List<UUID> {
+    val resourceResourceEntityPairs =
+      resources.map { it to getResourceEntity(it.logicalId, it.resourceType) }
+    val existingResourceEntityUuid =
+      resourceResourceEntityPairs
+        .filter { it.second != null }
+        .map {
+          val (resource, resourceEntity) = it
+          applyRemoteUpdate(resource)
+          resourceEntity!!.resourceUuid
+        }
+    val insertedResourceUuid =
+      resourceResourceEntityPairs
+        .filter { it.second == null }
+        .map { (resource, _) -> resource }
+        .let { insertResource(*it.toTypedArray(), lastUpdatedLocal = null) }
+    return existingResourceEntityUuid + insertedResourceUuid
   }
 
-  private suspend fun insertResource(resource: Resource, lastUpdatedLocal: Instant?): UUID {
-    val resourceUuid = UUID.randomUUID()
+  private suspend fun insertResource(
+    vararg resources: Resource,
+    lastUpdatedLocal: Instant?,
+  ): List<UUID> {
+    val indexResourceEntityPairs =
+      resources.map { resource ->
+        val resourceUuid = UUID.randomUUID()
 
-    // Use the local UUID as the logical ID of the resource
-    if (resource.id.isNullOrEmpty()) {
-      resource.id = resourceUuid.toString()
-    }
-
-    val entity =
-      ResourceEntity(
-        id = 0,
-        resourceType = resource.resourceType,
-        resourceUuid = resourceUuid,
-        resourceId = resource.logicalId,
-        serializedResource =
-          FhirContext.forR4Cached().newJsonParser().encodeResourceToString(resource),
-        versionId = resource.versionId,
-        lastUpdatedRemote = resource.lastUpdated,
-        lastUpdatedLocal = lastUpdatedLocal,
-      )
-    insertResource(entity)
-
-    val index =
-      ResourceIndices.Builder(resourceIndexer.index(resource))
-        .apply {
-          lastUpdatedLocal?.let {
-            addDateTimeIndex(
-              createLocalLastUpdatedIndex(entity.resourceType, InstantType(Date.from(it))),
-            )
-          }
+        // Use the local UUID as the logical ID of the resource
+        if (resource.id.isNullOrEmpty()) {
+          resource.id = resourceUuid.toString()
         }
-        .build()
 
-    updateIndicesForResource(index, resource.resourceType, resourceUuid)
+        val index =
+          ResourceIndices.Builder(resourceIndexer.index(resource))
+            .apply {
+              lastUpdatedLocal?.let {
+                addDateTimeIndex(
+                  createLocalLastUpdatedIndex(resource.resourceType, InstantType(Date.from(it))),
+                )
+              }
+            }
+            .build()
 
-    return entity.resourceUuid
+        index to
+          ResourceEntity(
+            id = 0,
+            resourceType = resource.resourceType,
+            resourceUuid = resourceUuid,
+            resourceId = resource.logicalId,
+            serializedResource =
+              FhirContext.forR4Cached().newJsonParser().encodeResourceToString(resource),
+            versionId = resource.versionId,
+            lastUpdatedRemote = resource.lastUpdated,
+            lastUpdatedLocal = lastUpdatedLocal,
+          )
+      }
+    val resourceEntities = indexResourceEntityPairs.map { it.second }
+    insertResource(*resourceEntities.toTypedArray())
+
+    val stringIndexes =
+      indexResourceEntityPairs.flatMap {
+        val (resourceIndices, resourceEntity) = it
+        resourceIndices.stringIndices.map { stringIndex ->
+          StringIndexEntity(
+            id = 0,
+            resourceType = resourceEntity.resourceType,
+            index = stringIndex,
+            resourceUuid = resourceEntity.resourceUuid,
+          )
+        }
+      }
+    insertStringIndex(*stringIndexes.toTypedArray())
+    val referenceIndexes =
+      indexResourceEntityPairs.flatMap {
+        val (resourceIndices, resourceEntity) = it
+        resourceIndices.referenceIndices.map { referenceIndex ->
+          ReferenceIndexEntity(
+            id = 0,
+            resourceType = resourceEntity.resourceType,
+            index = referenceIndex,
+            resourceUuid = resourceEntity.resourceUuid,
+          )
+        }
+      }
+    insertReferenceIndex(*referenceIndexes.toTypedArray())
+
+    val tokenIndexes =
+      indexResourceEntityPairs.flatMap {
+        val (resourceIndices, resourceEntity) = it
+        resourceIndices.tokenIndices.map { tokenIndex ->
+          TokenIndexEntity(
+            id = 0,
+            resourceType = resourceEntity.resourceType,
+            index = tokenIndex,
+            resourceUuid = resourceEntity.resourceUuid,
+          )
+        }
+      }
+    insertCodeIndex(*tokenIndexes.toTypedArray())
+
+    val quantityIndexes =
+      indexResourceEntityPairs.flatMap {
+        val (resourceIndices, resourceEntity) = it
+        resourceIndices.quantityIndices.map { quantityIndex ->
+          QuantityIndexEntity(
+            id = 0,
+            resourceType = resourceEntity.resourceType,
+            index = quantityIndex,
+            resourceUuid = resourceEntity.resourceUuid,
+          )
+        }
+      }
+    insertQuantityIndex(*quantityIndexes.toTypedArray())
+
+    val uriIndexes =
+      indexResourceEntityPairs.flatMap {
+        val (resourceIndices, resourceEntity) = it
+        resourceIndices.uriIndices.map { uriIndex ->
+          UriIndexEntity(
+            id = 0,
+            resourceType = resourceEntity.resourceType,
+            index = uriIndex,
+            resourceUuid = resourceEntity.resourceUuid,
+          )
+        }
+      }
+    insertUriIndex(*uriIndexes.toTypedArray())
+
+    val dateIndexes =
+      indexResourceEntityPairs.flatMap {
+        val (resourceIndices, resourceEntity) = it
+        resourceIndices.dateIndices.map { dateIndex ->
+          DateIndexEntity(
+            id = 0,
+            resourceType = resourceEntity.resourceType,
+            index = dateIndex,
+            resourceUuid = resourceEntity.resourceUuid,
+          )
+        }
+      }
+    insertDateIndex(*dateIndexes.toTypedArray())
+
+    val dateTimeIndexes =
+      indexResourceEntityPairs.flatMap {
+        val (resourceIndices, resourceEntity) = it
+        resourceIndices.dateTimeIndices.map { dateTimeIndex ->
+          DateTimeIndexEntity(
+            id = 0,
+            resourceType = resourceEntity.resourceType,
+            index = dateTimeIndex,
+            resourceUuid = resourceEntity.resourceUuid,
+          )
+        }
+      }
+    insertDateTimeIndex(*dateTimeIndexes.toTypedArray())
+
+    val numberIndexes =
+      indexResourceEntityPairs.flatMap {
+        val (resourceIndices, resourceEntity) = it
+        resourceIndices.numberIndices.map { numberIndex ->
+          NumberIndexEntity(
+            id = 0,
+            resourceType = resourceEntity.resourceType,
+            index = numberIndex,
+            resourceUuid = resourceEntity.resourceUuid,
+          )
+        }
+      }
+    insertNumberIndex(*numberIndexes.toTypedArray())
+
+    val positionIndexes =
+      indexResourceEntityPairs.flatMap {
+        val (resourceIndices, resourceEntity) = it
+        resourceIndices.positionIndices.map { positionIndex ->
+          PositionIndexEntity(
+            id = 0,
+            resourceType = resourceEntity.resourceType,
+            index = positionIndex,
+            resourceUuid = resourceEntity.resourceUuid,
+          )
+        }
+      }
+    insertPositionIndex(*positionIndexes.toTypedArray())
+
+    return resourceEntities.map { it.resourceUuid }
   }
 
   suspend fun updateAndIndexRemoteVersionIdAndLastUpdate(
@@ -319,96 +459,132 @@ internal abstract class ResourceDao {
     //  we can either use room-autovalue integration or go w/ embedded data classes.
     //  we may also want to merge them:
     //  https://github.com/jingtang10/fhir-engine/issues/33
-    index.stringIndices.forEach {
-      insertStringIndex(
+    index.stringIndices
+      .map {
         StringIndexEntity(
           id = 0,
           resourceType = resourceType,
           index = it,
           resourceUuid = resourceUuid,
-        ),
-      )
-    }
-    index.referenceIndices.forEach {
-      insertReferenceIndex(
+        )
+      }
+      .let { insertStringIndex(*it.toTypedArray()) }
+
+    index.referenceIndices
+      .map {
         ReferenceIndexEntity(
           id = 0,
           resourceType = resourceType,
           index = it,
           resourceUuid = resourceUuid,
-        ),
-      )
-    }
-    index.tokenIndices.forEach {
-      insertCodeIndex(
+        )
+      }
+      .let { insertReferenceIndex(*it.toTypedArray()) }
+
+    index.tokenIndices
+      .map {
         TokenIndexEntity(
           id = 0,
           resourceType = resourceType,
           index = it,
           resourceUuid = resourceUuid,
-        ),
-      )
-    }
-    index.quantityIndices.forEach {
-      insertQuantityIndex(
+        )
+      }
+      .let {
+        insertCodeIndex(
+          *it.toTypedArray(),
+        )
+      }
+
+    index.quantityIndices
+      .map {
         QuantityIndexEntity(
           id = 0,
           resourceType = resourceType,
           index = it,
           resourceUuid = resourceUuid,
-        ),
-      )
-    }
-    index.uriIndices.forEach {
-      insertUriIndex(
+        )
+      }
+      .let {
+        insertQuantityIndex(
+          *it.toTypedArray(),
+        )
+      }
+
+    index.uriIndices
+      .map {
         UriIndexEntity(
           id = 0,
           resourceType = resourceType,
           index = it,
           resourceUuid = resourceUuid,
-        ),
-      )
-    }
-    index.dateIndices.forEach {
-      insertDateIndex(
+        )
+      }
+      .let {
+        insertUriIndex(
+          *it.toTypedArray(),
+        )
+      }
+
+    index.dateIndices
+      .map {
         DateIndexEntity(
           id = 0,
           resourceType = resourceType,
           index = it,
           resourceUuid = resourceUuid,
-        ),
-      )
-    }
-    index.dateTimeIndices.forEach {
-      insertDateTimeIndex(
+        )
+      }
+      .let {
+        insertDateIndex(
+          *it.toTypedArray(),
+        )
+      }
+
+    index.dateTimeIndices
+      .map {
         DateTimeIndexEntity(
           id = 0,
           resourceType = resourceType,
           index = it,
           resourceUuid = resourceUuid,
-        ),
-      )
-    }
-    index.numberIndices.forEach {
-      insertNumberIndex(
+        )
+      }
+      .let {
+        insertDateTimeIndex(
+          *it.toTypedArray(),
+        )
+      }
+
+    index.numberIndices
+      .map {
         NumberIndexEntity(
           id = 0,
           resourceType = resourceType,
           index = it,
           resourceUuid = resourceUuid,
-        ),
-      )
-    }
-    index.positionIndices.forEach {
-      insertPositionIndex(
+        )
+      }
+      .let {
+        insertNumberIndex(
+          *it.toTypedArray(),
+        )
+      }
+
+    index.positionIndices
+      .map {
         PositionIndexEntity(
           id = 0,
           resourceType = resourceType,
           index = it,
           resourceUuid = resourceUuid,
-        ),
-      )
-    }
+        )
+      }
+      .let {
+        insertPositionIndex(
+          *it.toTypedArray(),
+        )
+      }
   }
 }
 
