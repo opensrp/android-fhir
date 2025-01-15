@@ -43,6 +43,9 @@ import com.google.android.fhir.toLocalChange
 import com.google.android.fhir.updateMeta
 import java.time.Instant
 import java.util.UUID
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.hl7.fhir.r4.model.IdType
 import org.hl7.fhir.r4.model.Resource
@@ -314,8 +317,8 @@ internal class DatabaseImpl(
           .newJsonParser()
           .parseResource(currentResourceEntity.serializedResource) as Resource
       val resourceUuid = currentResourceEntity.resourceUuid
-      updateResourceEntity(resourceUuid, updatedResource)
-
+      updateResourceEntity(resourceUuid, updatedResource) 
+      
       if (currentResourceId == updatedResource.logicalId) {
         return@withTransaction
       }
@@ -442,6 +445,11 @@ internal class DatabaseImpl(
         )
       }
     }
+  }
+
+  /** Implementation of a parallelized map */
+  suspend fun <A, B> Iterable<A>.pmap(f: suspend (A) -> B): List<B> = coroutineScope {
+    map { async { f(it) } }.awaitAll()
   }
 
   companion object {
