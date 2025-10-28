@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2024 Google LLC
+ * Copyright 2022-2025 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,14 @@
 
 package com.google.android.fhir.datacapture.mapping
 
+import com.google.android.fhir.datacapture.extensions.copyNestedItemsToChildlessAnswers
 import com.google.android.fhir.datacapture.extensions.createQuestionnaireResponseItem
 import com.google.android.fhir.datacapture.extensions.filterByCodeInNameExtension
 import com.google.android.fhir.datacapture.extensions.initialExpression
 import com.google.android.fhir.datacapture.extensions.logicalId
+import com.google.android.fhir.datacapture.extensions.matches
 import com.google.android.fhir.datacapture.extensions.questionnaireLaunchContexts
+import com.google.android.fhir.datacapture.extensions.shouldHaveNestedItemsUnderAnswers
 import com.google.android.fhir.datacapture.extensions.targetStructureMap
 import com.google.android.fhir.datacapture.extensions.toCodeType
 import com.google.android.fhir.datacapture.extensions.toCoding
@@ -227,46 +230,130 @@ object ResourceMapper {
         launchContexts,
         questionnaire.questionnaireLaunchContexts ?: listOf(),
       )
-    populateInitialValues(questionnaire.item, filteredLaunchContexts)
     return QuestionnaireResponse().apply {
-      item = questionnaire.item.map { it.createQuestionnaireResponseItem() }
+      item =
+        createPopulatedResponseItems(questionnaire.item, filteredLaunchContexts).toMutableList()
     }
   }
 
-  private suspend fun populateInitialValues(
+  private suspend fun createPopulatedResponseItems(
     questionnaireItems: List<Questionnaire.QuestionnaireItemComponent>,
     launchContexts: Map<String, Resource>,
-  ) {
-    questionnaireItems.forEach { populateInitialValue(it, launchContexts) }
+  ): List<QuestionnaireResponse.QuestionnaireResponseItemComponent> {
+    return questionnaireItems.map { it.createPopulatedResponseItem(launchContexts) }
   }
 
-  private suspend fun populateInitialValue(
+  private suspend fun Questionnaire.QuestionnaireItemComponent.createPopulatedResponseItem(
+    launchContexts: Map<String, Resource>,
+  ): QuestionnaireResponse.QuestionnaireResponseItemComponent {
+    val questionnaireResponseItem = createQuestionnaireResponseItem()
+    populateQuestionnaireResponseItem(this, questionnaireResponseItem, launchContexts)
+    return questionnaireResponseItem
+  }
+
+  private suspend fun populateQuestionnaireResponseItem(
     questionnaireItem: Questionnaire.QuestionnaireItemComponent,
+    questionnaireResponseItem: QuestionnaireResponse.QuestionnaireResponseItemComponent,
     launchContexts: Map<String, Resource>,
   ) {
     check(questionnaireItem.initial.isEmpty() || questionnaireItem.initialExpression == null) {
       "QuestionnaireItem item is not allowed to have both initial.value and initial expression. See rule at http://build.fhir.org/ig/HL7/sdc/expressions.html#initialExpression."
     }
 
+    // Initial values can't be specified for groups or display items
+    check(
+      !(questionnaireItem.type == Questionnaire.QuestionnaireItemType.GROUP ||
+        questionnaireItem.type == Questionnaire.QuestionnaireItemType.DISPLAY) ||
+        (questionnaireItem.initial.isEmpty() && questionnaireItem.initialExpression == null),
+    ) {
+      "QuestionnaireItem item is not allowed to have initial value or initial expression for groups or display items. See rule at http://build.fhir.org/ig/HL7/sdc/expressions.html#initialExpression."
+    }
+
     questionnaireItem.initialExpression
       ?.let {
         evaluateToBase(
-            questionnaireResponse = null,
-            questionnaireResponseItem = null,
-            expression = it.expression,
-            contextMap = launchContexts,
-          )
-          .firstOrNull()
+          questionnaireResponse = null,
+          questionnaireResponseItem = null,
+          expression = it.expression,
+          contextMap = launchContexts,
+        )
       }
       ?.let {
-        // Set initial value for the questionnaire item. Questionnaire items should not have both
-        // initial value and initial expression.
-        val value = it.asExpectedType(questionnaireItem.type)
-        questionnaireItem.initial =
-          mutableListOf(Questionnaire.QuestionnaireItemInitialComponent().setValue(value))
+        // Set initial value for the questionnaire item.
+        if (it.isEmpty()) return@let
+
+        // If questionnaireItem.repeats is false only first value is selected from initialExpression
+        // result set
+        val evaluatedExpressionResult =
+          if (questionnaireItem.repeats) {
+            it.map { it.asExpectedType(questionnaireItem.type) }
+          } else {
+            listOf(it.first().asExpectedType(questionnaireItem.type))
+          }
+
+        /**
+         * For answer options, the initialSelected extension is used to highlight initial values.
+         *
+         * Note: If the initial expression evaluates to five values (1, 2, 3, 4, 5) but only three
+         * answer options (1, 2, 3) exist, then 4 and 5 will be ignored. These values are not added
+         * as additional options, nor would it make sense to do so. This behavior ensures the answer
+         * options remain consistent with the defined set.
+         */
+        val answers =
+          if (questionnaireItem.answerOption.isEmpty()) {
+            evaluatedExpressionResult.map {
+              QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply { value = it }
+            }
+          } else {
+            questionnaireItem.answerOption.mapNotNull { answerOption ->
+              val optionValue = answerOption.value ?: return@mapNotNull null
+              if (
+                evaluatedExpressionResult.any { evaluatedValue ->
+                  if (optionValue is Coding && evaluatedValue is Coding) {
+                    optionValue.matches(evaluatedValue)
+                  } else {
+                    optionValue.equalsDeep(evaluatedValue)
+                  }
+                }
+              ) {
+                QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
+                  value = optionValue
+                }
+              } else {
+                null
+              }
+            }
+          }
+        questionnaireResponseItem.answer = answers.toMutableList()
+        if (
+          questionnaireItem.shouldHaveNestedItemsUnderAnswers &&
+            questionnaireResponseItem.answer.isNotEmpty()
+        ) {
+          questionnaireResponseItem.copyNestedItemsToChildlessAnswers(questionnaireItem)
+        }
       }
 
-    populateInitialValues(questionnaireItem.item, launchContexts)
+    if (questionnaireItem.shouldHaveNestedItemsUnderAnswers) {
+      questionnaireResponseItem.answer.orEmpty().forEach { answerComponent ->
+        questionnaireItem.item.zipByLinkId(answerComponent.item.orEmpty()) {
+          childQuestionnaireItem,
+          childResponseItem,
+          ->
+          populateQuestionnaireResponseItem(
+            childQuestionnaireItem,
+            childResponseItem,
+            launchContexts,
+          )
+        }
+      }
+    } else {
+      questionnaireItem.item.zipByLinkId(questionnaireResponseItem.item.orEmpty()) {
+        childQuestionnaireItem,
+        childResponseItem,
+        ->
+        populateQuestionnaireResponseItem(childQuestionnaireItem, childResponseItem, launchContexts)
+      }
+    }
   }
 
   /**

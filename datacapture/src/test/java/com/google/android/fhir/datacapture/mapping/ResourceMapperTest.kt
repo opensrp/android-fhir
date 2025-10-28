@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2024 Google LLC
+ * Copyright 2022-2025 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,9 @@ import org.hl7.fhir.r4.elementmodel.Manager
 import org.hl7.fhir.r4.model.Address
 import org.hl7.fhir.r4.model.Base
 import org.hl7.fhir.r4.model.BooleanType
+import org.hl7.fhir.r4.model.Bundle
 import org.hl7.fhir.r4.model.CodeType
+import org.hl7.fhir.r4.model.CodeableConcept
 import org.hl7.fhir.r4.model.Coding
 import org.hl7.fhir.r4.model.ContactPoint
 import org.hl7.fhir.r4.model.DateType
@@ -1955,12 +1957,14 @@ class ResourceMapperTest {
                 listOf(
                   Questionnaire.QuestionnaireItemAnswerOptionComponent(
                     Coding().apply {
+                      system = AdministrativeGender.MALE.system
                       code = AdministrativeGender.MALE.toCode()
                       display = AdministrativeGender.MALE.display
                     },
                   ),
                   Questionnaire.QuestionnaireItemAnswerOptionComponent(
                     Coding().apply {
+                      system = AdministrativeGender.FEMALE.system
                       code = AdministrativeGender.FEMALE.toCode()
                       display = AdministrativeGender.FEMALE.display
                     },
@@ -2011,12 +2015,14 @@ class ResourceMapperTest {
                   Coding().apply {
                     code = AdministrativeGender.MALE.toCode()
                     display = AdministrativeGender.MALE.display
+                    system = AdministrativeGender.MALE.system
                   },
                 ),
                 Questionnaire.QuestionnaireItemAnswerOptionComponent(
                   Coding().apply {
                     code = AdministrativeGender.FEMALE.toCode()
                     display = AdministrativeGender.FEMALE.display
+                    system = AdministrativeGender.MALE.system
                   },
                 ),
               )
@@ -2055,6 +2061,199 @@ class ResourceMapperTest {
         (questionnaireResponse.item[0].answer[0].item[0].answer[0].value as StringType).value,
       )
       .isEqualTo(patientId)
+  }
+
+  @Test
+  fun `populate() should tolerate empty expression results for questions with nested items`() =
+    runBlocking {
+      val questionnaire =
+        Questionnaire()
+          .apply {
+            addExtension().apply {
+              url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+              extension =
+                listOf(
+                  Extension("name", Coding(CODE_SYSTEM_LAUNCH_CONTEXT, "patient", "Patient")),
+                  Extension("type", CodeType("Patient")),
+                )
+            }
+          }
+          .addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "patient-contact"
+              type = Questionnaire.QuestionnaireItemType.STRING
+              extension =
+                listOf(
+                  Extension(
+                    ITEM_INITIAL_EXPRESSION_URL,
+                    Expression().apply {
+                      language = "text/fhirpath"
+                      expression = "%patient.contact.given"
+                    },
+                  ),
+                )
+              item =
+                listOf(
+                  Questionnaire.QuestionnaireItemComponent().apply {
+                    linkId = "patient-contact-type"
+                    type = Questionnaire.QuestionnaireItemType.STRING
+                  },
+                )
+            },
+          )
+
+      val questionnaireResponse =
+        ResourceMapper.populate(questionnaire, mapOf("patient" to Patient()))
+
+      val responseItem = questionnaireResponse.item.single()
+      assertThat(responseItem.answer?.isEmpty() ?: true).isTrue()
+    }
+
+  @Test
+  fun `populate() should populate questions nested under non-repeated groups`() = runBlocking {
+    val questionnaire =
+      Questionnaire()
+        .apply {
+          addExtension().apply {
+            url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+            extension =
+              listOf(
+                Extension("name", Coding(CODE_SYSTEM_LAUNCH_CONTEXT, "patient", "Patient")),
+                Extension("type", CodeType("Patient")),
+              )
+          }
+        }
+        .addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "demographics"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            item =
+              listOf(
+                Questionnaire.QuestionnaireItemComponent().apply {
+                  linkId = "patient-name"
+                  type = Questionnaire.QuestionnaireItemType.STRING
+                  extension =
+                    listOf(
+                      Extension(
+                        ITEM_INITIAL_EXPRESSION_URL,
+                        Expression().apply {
+                          language = "text/fhirpath"
+                          expression = "%patient.name.given.first()"
+                        },
+                      ),
+                    )
+                },
+              )
+          },
+        )
+
+    val patient =
+      Patient().apply {
+        name =
+          listOf(
+            HumanName().apply {
+              family = "User"
+              addGiven("Test")
+            },
+          )
+      }
+
+    val questionnaireResponse = ResourceMapper.populate(questionnaire, mapOf("patient" to patient))
+
+    val groupResponse = questionnaireResponse.item.single()
+    val nameResponse = groupResponse.item.single()
+
+    assertThat((nameResponse.answer.single().value as StringType).value).isEqualTo("Test")
+  }
+
+  @Test
+  fun `populate() should populate nested items for each repeating answer`() = runBlocking {
+    val questionnaire =
+      Questionnaire()
+        .apply {
+          addExtension().apply {
+            url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+            extension =
+              listOf(
+                Extension("name", Coding(CODE_SYSTEM_LAUNCH_CONTEXT, "patient", "Patient")),
+                Extension("type", CodeType("Patient")),
+              )
+          }
+        }
+        .addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "favorite-colors"
+            type = Questionnaire.QuestionnaireItemType.CHOICE
+            repeats = true
+            answerOption =
+              listOf(
+                Questionnaire.QuestionnaireItemAnswerOptionComponent(
+                  Coding().apply {
+                    system = "http://example.org/colors"
+                    code = "red"
+                    display = "Red"
+                  },
+                ),
+                Questionnaire.QuestionnaireItemAnswerOptionComponent(
+                  Coding().apply {
+                    system = "http://example.org/colors"
+                    code = "blue"
+                    display = "Blue"
+                  },
+                ),
+              )
+            extension =
+              listOf(
+                Extension(
+                  ITEM_INITIAL_EXPRESSION_URL,
+                  Expression().apply {
+                    language = "text/fhirpath"
+                    expression = "%patient.extension('http://example.org/favorite-color').value"
+                  },
+                ),
+              )
+            item =
+              listOf(
+                Questionnaire.QuestionnaireItemComponent().apply {
+                  linkId = "color-source"
+                  type = Questionnaire.QuestionnaireItemType.STRING
+                  extension =
+                    listOf(
+                      Extension(
+                        ITEM_INITIAL_EXPRESSION_URL,
+                        Expression().apply {
+                          language = "text/fhirpath"
+                          expression = "%patient.id"
+                        },
+                      ),
+                    )
+                },
+              )
+          },
+        )
+
+    val patient =
+      Patient().apply {
+        id = "patient-1"
+        addExtension(
+          "http://example.org/favorite-color",
+          Coding("http://example.org/colors", "red", "Red"),
+        )
+        addExtension(
+          "http://example.org/favorite-color",
+          Coding("http://example.org/colors", "blue", "Blue"),
+        )
+      }
+
+    val questionnaireResponse = ResourceMapper.populate(questionnaire, mapOf("patient" to patient))
+
+    val answerComponents = questionnaireResponse.item.single().answer
+
+    assertThat(answerComponents.map { (it.value as Coding).code }).containsExactly("red", "blue")
+    answerComponents.forEach { answerComponent ->
+      val nestedResponse = answerComponent.item.single()
+      assertThat((nestedResponse.answer.single().value as StringType).value).isEqualTo("patient-1")
+    }
   }
 
   private fun createPatientResource(): Patient {
@@ -2974,6 +3173,696 @@ class ResourceMapperTest {
   }
 
   @Test
+  fun `populate() should fail with IllegalStateException when QuestionnaireItem of group item has a initial value`():
+    Unit = runBlocking {
+    val questionnaire =
+      Questionnaire()
+        .apply {
+          addExtension().apply {
+            url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+            extension =
+              listOf(
+                Extension("name", Coding(CODE_SYSTEM_LAUNCH_CONTEXT, "father", "Father")),
+                Extension("type", CodeType("Patient")),
+              )
+          }
+        }
+        .addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "patient-gender-group-initial-expression"
+            type = Questionnaire.QuestionnaireItemType.GROUP
+            extension =
+              listOf(
+                Extension(
+                  ITEM_INITIAL_EXPRESSION_URL,
+                  Expression().apply {
+                    language = "text/fhirpath"
+                    expression = "%father.gender"
+                  },
+                ),
+              )
+          },
+        )
+
+    val patient = Patient().apply { gender = Enumerations.AdministrativeGender.MALE }
+    val errorMessage =
+      assertFailsWith<IllegalStateException> {
+          ResourceMapper.populate(questionnaire, mapOf("father" to patient))
+        }
+        .localizedMessage
+    assertThat(errorMessage)
+      .isEqualTo(
+        "QuestionnaireItem item is not allowed to have initial value or initial expression for groups or display items. See rule at http://build.fhir.org/ig/HL7/sdc/expressions.html#initialExpression.",
+      )
+  }
+
+  @Test
+  fun `populate() should fail with IllegalStateException when QuestionnaireItem of display item has a initial value`():
+    Unit = runBlocking {
+    val questionnaire =
+      Questionnaire()
+        .apply {
+          addExtension().apply {
+            url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+            extension =
+              listOf(
+                Extension("name", Coding(CODE_SYSTEM_LAUNCH_CONTEXT, "father", "Father")),
+                Extension("type", CodeType("Patient")),
+              )
+          }
+        }
+        .addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "patient-gender-display-initial-expression"
+            type = Questionnaire.QuestionnaireItemType.DISPLAY
+            extension =
+              listOf(
+                Extension(
+                  ITEM_INITIAL_EXPRESSION_URL,
+                  Expression().apply {
+                    language = "text/fhirpath"
+                    expression = "%father.gender"
+                  },
+                ),
+              )
+          },
+        )
+
+    val patient = Patient().apply { gender = Enumerations.AdministrativeGender.MALE }
+    val errorMessage =
+      assertFailsWith<IllegalStateException> {
+          ResourceMapper.populate(questionnaire, mapOf("father" to patient))
+        }
+        .localizedMessage
+    assertThat(errorMessage)
+      .isEqualTo(
+        "QuestionnaireItem item is not allowed to have initial value or initial expression for groups or display items. See rule at http://build.fhir.org/ig/HL7/sdc/expressions.html#initialExpression.",
+      )
+  }
+
+  @Test
+  fun `populate() should select answerOption of type coding(without system) if initialExpression result matches its coding(without system)`() =
+    runBlocking {
+      val questionnaire =
+        Questionnaire()
+          .apply {
+            addExtension().apply {
+              url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+              extension =
+                listOf(
+                  Extension(
+                    "name",
+                    Coding(
+                      CODE_SYSTEM_LAUNCH_CONTEXT,
+                      "observation",
+                      "Test Observation",
+                    ),
+                  ),
+                  Extension("type", CodeType("Observation")),
+                )
+            }
+          }
+          .addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "observation-choice"
+              type = Questionnaire.QuestionnaireItemType.CHOICE
+              extension =
+                listOf(
+                  Extension(
+                    ITEM_INITIAL_EXPRESSION_URL,
+                    Expression().apply {
+                      language = "text/fhirpath"
+                      expression = "%observation.value.coding"
+                    },
+                  ),
+                )
+              answerOption =
+                listOf(
+                  Questionnaire.QuestionnaireItemAnswerOptionComponent(
+                    Coding().apply {
+                      code = "correct-code-val"
+                      display = "correct-display-val"
+                    },
+                  ),
+                  Questionnaire.QuestionnaireItemAnswerOptionComponent(
+                    Coding().apply {
+                      code = "wrong-code-val"
+                      display = "wrong-display-val"
+                    },
+                  ),
+                )
+            },
+          )
+
+      val observation =
+        Observation().apply {
+          value =
+            CodeableConcept().apply {
+              coding =
+                mutableListOf(
+                  Coding().apply {
+                    code = "correct-code-val"
+                    display = "correct-display-val"
+                  },
+                )
+            }
+        }
+
+      val questionnaireResponse =
+        ResourceMapper.populate(questionnaire, mapOf("observation" to observation))
+
+      with(questionnaireResponse.item[0].answer[0].value as Coding) {
+        assertThat(this.code).isEqualTo("correct-code-val")
+        assertThat(this.display).isEqualTo("correct-display-val")
+      }
+    }
+
+  @Test
+  fun `populate() should select coding answerOption when only display differs`() = runBlocking {
+    val matchingAnswerOption =
+      Coding().apply {
+        system = "http://loinc.org"
+        code = "12345-6"
+        version = "1.0"
+        display = "Answer option display"
+      }
+    val questionnaire =
+      createObservationChoiceQuestionnaire(
+        matchingAnswerOption,
+        Coding().apply {
+          system = "http://loinc.org"
+          code = "65432-1"
+          display = "Fallback display"
+        },
+      )
+
+    val observationCoding =
+      Coding().apply {
+        system = matchingAnswerOption.system
+        code = matchingAnswerOption.code
+        version = matchingAnswerOption.version
+        display = "Observation display"
+      }
+
+    val questionnaireResponse =
+      ResourceMapper.populate(
+        questionnaire,
+        mapOf("observation" to observationWithCoding(observationCoding)),
+      )
+
+    val responseItem = questionnaireResponse.item.single()
+    assertThat(responseItem.hasAnswer()).isTrue()
+    val answerCoding = responseItem.answer.single().value as Coding
+    assertThat(answerCoding.code).isEqualTo(matchingAnswerOption.code)
+    assertThat(answerCoding.system).isEqualTo(matchingAnswerOption.system)
+    assertThat(answerCoding.version).isEqualTo(matchingAnswerOption.version)
+    assertThat(answerCoding.display).isEqualTo(matchingAnswerOption.display)
+  }
+
+  @Test
+  fun `populate() should not mutate questionnaire when populating answers`() = runBlocking {
+    val questionnaire =
+      Questionnaire()
+        .apply {
+          addExtension().apply {
+            url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+            extension =
+              listOf(
+                Extension("name", Coding(CODE_SYSTEM_LAUNCH_CONTEXT, "patient", "Patient")),
+                Extension("type", CodeType("Patient")),
+              )
+          }
+        }
+        .addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "patient-first-name"
+            type = Questionnaire.QuestionnaireItemType.STRING
+            extension =
+              listOf(
+                Extension(
+                  ITEM_INITIAL_EXPRESSION_URL,
+                  Expression().apply {
+                    language = "text/fhirpath"
+                    expression = "%patient.name.first().given.first()"
+                  },
+                ),
+              )
+          },
+        )
+
+    val patient =
+      Patient().apply {
+        name = listOf(HumanName().apply { given = mutableListOf(StringType("Jing")) })
+      }
+
+    val questionnaireResponse = ResourceMapper.populate(questionnaire, mapOf("patient" to patient))
+
+    val question = questionnaire.item.single()
+    assertThat(question.initial).isEmpty()
+    assertThat(question.answerOption.none { it.initialSelected }).isTrue()
+
+    val answer = questionnaireResponse.item.single().answer.single().value as StringType
+    assertThat(answer.value).isEqualTo("Jing")
+  }
+
+  @Test
+  fun `populate() should not select coding answerOption when codes differ`() = runBlocking {
+    val matchingAnswerOption =
+      Coding().apply {
+        system = "http://loinc.org"
+        code = "12345-6"
+        version = "1.0"
+        display = "Answer option display"
+      }
+    val questionnaire =
+      createObservationChoiceQuestionnaire(
+        matchingAnswerOption,
+        Coding().apply {
+          system = "http://loinc.org"
+          code = "65432-1"
+          display = "Fallback display"
+        },
+      )
+
+    val questionnaireResponse =
+      ResourceMapper.populate(
+        questionnaire,
+        mapOf(
+          "observation" to
+            observationWithCoding(
+              Coding().apply {
+                system = matchingAnswerOption.system
+                code = "different-code"
+                version = matchingAnswerOption.version
+                display = "Observation display"
+              },
+            ),
+        ),
+      )
+
+    val question = questionnaire.item.single()
+    assertThat(question.answerOption.none { it.initialSelected }).isTrue()
+    assertThat(questionnaireResponse.item.single().hasAnswer()).isFalse()
+  }
+
+  @Test
+  fun `populate() should not select coding answerOption when systems differ`() = runBlocking {
+    val matchingAnswerOption =
+      Coding().apply {
+        system = "http://loinc.org"
+        code = "12345-6"
+        version = "1.0"
+        display = "Answer option display"
+      }
+    val questionnaire =
+      createObservationChoiceQuestionnaire(
+        matchingAnswerOption,
+        Coding().apply {
+          system = "http://loinc.org"
+          code = "65432-1"
+          display = "Fallback display"
+        },
+      )
+
+    val questionnaireResponse =
+      ResourceMapper.populate(
+        questionnaire,
+        mapOf(
+          "observation" to
+            observationWithCoding(
+              Coding().apply {
+                system = "http://snomed.info/sct"
+                code = matchingAnswerOption.code
+                version = matchingAnswerOption.version
+                display = "Observation display"
+              },
+            ),
+        ),
+      )
+
+    assertThat(questionnaireResponse.item.single().hasAnswer()).isFalse()
+  }
+
+  @Test
+  fun `populate() should not select coding answerOption when versions differ`() = runBlocking {
+    val matchingAnswerOption =
+      Coding().apply {
+        system = "http://loinc.org"
+        code = "12345-6"
+        version = "1.0"
+        display = "Answer option display"
+      }
+    val questionnaire =
+      createObservationChoiceQuestionnaire(
+        matchingAnswerOption,
+        Coding().apply {
+          system = "http://loinc.org"
+          code = "65432-1"
+          display = "Fallback display"
+        },
+      )
+
+    val questionnaireResponse =
+      ResourceMapper.populate(
+        questionnaire,
+        mapOf(
+          "observation" to
+            observationWithCoding(
+              Coding().apply {
+                system = matchingAnswerOption.system
+                code = matchingAnswerOption.code
+                version = "2.0"
+                display = "Observation display"
+              },
+            ),
+        ),
+      )
+
+    val question = questionnaire.item.single()
+    assertThat(question.answerOption.none { it.initialSelected }).isTrue()
+    assertThat(questionnaireResponse.item.single().hasAnswer()).isFalse()
+  }
+
+  @Test
+  fun `populate() should select single answer for non repeating question with answerOption`() =
+    runBlocking {
+      val questionnaire =
+        Questionnaire()
+          .apply {
+            addExtension().apply {
+              url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+              extension =
+                listOf(
+                  Extension(
+                    "name",
+                    Coding(
+                      CODE_SYSTEM_LAUNCH_CONTEXT,
+                      "observations",
+                      "List of observations",
+                    ),
+                  ),
+                  Extension("type", CodeType("Observation")),
+                )
+            }
+          }
+          .addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "observation-choice"
+              type = Questionnaire.QuestionnaireItemType.CHOICE
+              repeats = false
+              extension =
+                listOf(
+                  Extension(
+                    ITEM_INITIAL_EXPRESSION_URL,
+                    Expression().apply {
+                      language = "text/fhirpath"
+                      expression = "%observations.entry.resource.value.coding"
+                    },
+                  ),
+                )
+              answerOption =
+                listOf(
+                  Questionnaire.QuestionnaireItemAnswerOptionComponent(
+                    Coding().apply {
+                      code = "correct-code-val"
+                      display = "correct-display-val"
+                    },
+                  ),
+                  Questionnaire.QuestionnaireItemAnswerOptionComponent(
+                    Coding().apply {
+                      code = "wrong-code-val"
+                      display = "wrong-display-val"
+                    },
+                  ),
+                )
+            },
+          )
+
+      val observation1 =
+        Observation().apply {
+          status = Observation.ObservationStatus.FINAL
+          value =
+            CodeableConcept().apply {
+              coding =
+                mutableListOf(
+                  Coding().apply {
+                    code = "correct-code-val"
+                    display = "correct-display-val"
+                  },
+                )
+            }
+        }
+      val observation2 =
+        Observation().apply {
+          status = Observation.ObservationStatus.FINAL
+          value =
+            CodeableConcept().apply {
+              coding =
+                mutableListOf(
+                  Coding().apply {
+                    code = "wrong-code-val"
+                    display = "wrong-display-val"
+                  },
+                )
+            }
+        }
+      val observationBundle =
+        Bundle().apply {
+          addEntry().resource = observation1
+          addEntry().resource = observation2
+        }
+
+      val questionnaireResponse =
+        ResourceMapper.populate(questionnaire, mapOf("observations" to observationBundle))
+
+      assertThat((questionnaireResponse.item[0].answer[0].value as Coding).code)
+        .isEqualTo("correct-code-val")
+      assertThat((questionnaireResponse.item[0].answer[0].value as Coding).display)
+        .isEqualTo("correct-display-val")
+    }
+
+  @Test
+  fun `populate() should select multiple answer for repeating question with answerOption`() =
+    runBlocking {
+      val questionnaire =
+        Questionnaire()
+          .apply {
+            addExtension().apply {
+              url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+              extension =
+                listOf(
+                  Extension(
+                    "name",
+                    Coding(
+                      CODE_SYSTEM_LAUNCH_CONTEXT,
+                      "observations",
+                      "List of observations",
+                    ),
+                  ),
+                  Extension("type", CodeType("Observation")),
+                )
+            }
+          }
+          .addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "observation-choice"
+              type = Questionnaire.QuestionnaireItemType.CHOICE
+              repeats = true
+              extension =
+                listOf(
+                  Extension(
+                    ITEM_INITIAL_EXPRESSION_URL,
+                    Expression().apply {
+                      language = "text/fhirpath"
+                      expression = "%observations.entry.resource.value.coding"
+                    },
+                  ),
+                )
+              answerOption =
+                listOf(
+                  Questionnaire.QuestionnaireItemAnswerOptionComponent(
+                    Coding().apply {
+                      code = "correct-code-val"
+                      display = "correct-display-val"
+                    },
+                  ),
+                  Questionnaire.QuestionnaireItemAnswerOptionComponent(
+                    Coding().apply {
+                      code = "correct2-code-val"
+                      display = "correct2-display-val"
+                    },
+                  ),
+                )
+            },
+          )
+
+      val observation1 =
+        Observation().apply {
+          status = Observation.ObservationStatus.FINAL
+          value =
+            CodeableConcept().apply {
+              coding =
+                mutableListOf(
+                  Coding().apply {
+                    code = "correct-code-val"
+                    display = "correct-display-val"
+                  },
+                )
+            }
+        }
+      val observation2 =
+        Observation().apply {
+          status = Observation.ObservationStatus.FINAL
+          value =
+            CodeableConcept().apply {
+              coding =
+                mutableListOf(
+                  Coding().apply {
+                    code = "correct2-code-val"
+                    display = "correct2-display-val"
+                  },
+                )
+            }
+        }
+      val observationBundle =
+        Bundle().apply {
+          addEntry().resource = observation1
+          addEntry().resource = observation2
+        }
+
+      val questionnaireResponse =
+        ResourceMapper.populate(questionnaire, mapOf("observations" to observationBundle))
+
+      with(questionnaireResponse.item[0].answer[0].value as Coding) {
+        assertThat(this.code).isEqualTo("correct-code-val")
+        assertThat(this.display).isEqualTo("correct-display-val")
+      }
+      with(questionnaireResponse.item[0].answer[1].value as Coding) {
+        assertThat(this.code).isEqualTo("correct2-code-val")
+        assertThat(this.display).isEqualTo("correct2-display-val")
+      }
+    }
+
+  @Test
+  fun `populate() should select a single initial answer for non repeating question without answerOption`() =
+    runBlocking {
+      val questionnaire =
+        Questionnaire()
+          .apply {
+            addExtension().apply {
+              url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+              extension =
+                listOf(
+                  Extension(
+                    "name",
+                    Coding(
+                      CODE_SYSTEM_LAUNCH_CONTEXT,
+                      "patient",
+                      "Patient",
+                    ),
+                  ),
+                  Extension("type", CodeType("Patient")),
+                )
+            }
+          }
+          .addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "patient-name"
+              type = Questionnaire.QuestionnaireItemType.TEXT
+              repeats = false
+              extension =
+                listOf(
+                  Extension(
+                    ITEM_INITIAL_EXPRESSION_URL,
+                    Expression().apply {
+                      language = "text/fhirpath"
+                      expression = "%patient.name.given"
+                    },
+                  ),
+                )
+            },
+          )
+
+      val patient =
+        Patient().apply {
+          addName(
+            HumanName().apply { addGiven("Parth") },
+          )
+        }
+
+      val questionnaireResponse =
+        ResourceMapper.populate(questionnaire, mapOf("patient" to patient))
+
+      assertThat((questionnaireResponse.item[0].answer[0].valueStringType.valueAsString))
+        .isEqualTo("Parth")
+    }
+
+  @Test
+  fun `populate() should select a first single initial answer for non repeating question without answerOption and initialExpression evalutes to multiple values`() =
+    runBlocking {
+      val questionnaire =
+        Questionnaire()
+          .apply {
+            addExtension().apply {
+              url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+              extension =
+                listOf(
+                  Extension(
+                    "name",
+                    Coding(
+                      CODE_SYSTEM_LAUNCH_CONTEXT,
+                      "patients",
+                      "list of patients",
+                    ),
+                  ),
+                  Extension("type", CodeType("Patient")),
+                )
+            }
+          }
+          .addItem(
+            Questionnaire.QuestionnaireItemComponent().apply {
+              linkId = "patient-name"
+              type = Questionnaire.QuestionnaireItemType.TEXT
+              repeats = false
+              extension =
+                listOf(
+                  Extension(
+                    ITEM_INITIAL_EXPRESSION_URL,
+                    Expression().apply {
+                      language = "text/fhirpath"
+                      expression = "%patients.entry.resource.name.given"
+                    },
+                  ),
+                )
+            },
+          )
+
+      val patient1 =
+        Patient().apply {
+          addName(
+            HumanName().apply { addGiven("Parth") },
+          )
+        }
+      val patient2 =
+        Patient().apply {
+          addName(
+            HumanName().apply { addGiven("Jose") },
+          )
+        }
+
+      val patientBundle =
+        Bundle().apply {
+          addEntry().resource = patient1
+          addEntry().resource = patient2
+        }
+      val questionnaireResponse =
+        ResourceMapper.populate(questionnaire, mapOf("patients" to patientBundle))
+
+      assertThat((questionnaireResponse.item[0].answer[0].valueStringType.valueAsString))
+        .isEqualTo("Parth")
+    }
+
+  @Test
   fun `extract() definition based extraction should extract multiple values of a list field in a group`():
     Unit = runBlocking {
     @Language("JSON")
@@ -3105,6 +3994,54 @@ class ResourceMapperTest {
       bundle.entry.find { it.resource.resourceType == ResourceType.Patient }?.resource as Patient
     assertThat(patient.name.first().family).isEqualTo("John Doe")
   }
+
+  private fun createObservationChoiceQuestionnaire(
+    vararg answerOptions: Coding,
+  ): Questionnaire =
+    Questionnaire()
+      .apply {
+        addExtension().apply {
+          url = EXTENSION_SDC_QUESTIONNAIRE_LAUNCH_CONTEXT
+          extension =
+            listOf(
+              Extension(
+                "name",
+                Coding(
+                  CODE_SYSTEM_LAUNCH_CONTEXT,
+                  "observation",
+                  "Test Observation",
+                ),
+              ),
+              Extension("type", CodeType("Observation")),
+            )
+        }
+      }
+      .addItem(
+        Questionnaire.QuestionnaireItemComponent().apply {
+          linkId = "observation-choice"
+          type = Questionnaire.QuestionnaireItemType.CHOICE
+          extension =
+            listOf(
+              Extension(
+                ITEM_INITIAL_EXPRESSION_URL,
+                Expression().apply {
+                  language = "text/fhirpath"
+                  expression = "%observation.value.coding"
+                },
+              ),
+            )
+          answerOption =
+            answerOptions
+              .map { coding -> Questionnaire.QuestionnaireItemAnswerOptionComponent(coding) }
+              .toMutableList()
+        },
+      )
+
+  private fun observationWithCoding(coding: Coding): Observation =
+    Observation().apply {
+      status = Observation.ObservationStatus.FINAL
+      value = CodeableConcept().apply { this.coding = mutableListOf(coding) }
+    }
 
   private fun readFileFromResourcesAsString(filename: String) =
     readFileFromResources(filename).bufferedReader().use { it.readText() }
