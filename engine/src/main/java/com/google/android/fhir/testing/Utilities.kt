@@ -131,7 +131,6 @@ internal open class TestDownloadManagerImpl(
 
   override suspend fun getSummaryRequestUrls() =
     queries
-      .stream()
       .map { ResourceType.fromCode(it.substringBefore("?")) to it.plus("?_summary=count") }
       .toList()
       .toMap()
