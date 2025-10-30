@@ -50,13 +50,13 @@ object Releases {
 
   object Engine : LibraryArtifact {
     override val artifactId = "engine"
-    override val version = "1.2.0-preview-SNAPSHOT"
+    override val version = "1.2.0-preview1-SNAPSHOT"
     override val name = "Android FHIR Engine Library"
   }
 
   object DataCapture : LibraryArtifact {
     override val artifactId = "data-capture"
-    override val version = "1.3.0-preview8-SNAPSHOT"
+    override val version = "1.3.0-preview9-SNAPSHOT"
     override val name = "Android FHIR Structured Data Capture Library"
   }
 
@@ -69,13 +69,13 @@ object Releases {
   object Contrib {
     object Barcode : LibraryArtifact {
       override val artifactId = "contrib-barcode"
-      override val version = "0.1.0-beta3-preview7-SNAPSHOT"
+      override val version = "0.1.0-beta3-preview8-SNAPSHOT"
       override val name = "Android FHIR Structured Data Capture - Barcode Extensions (contrib)"
     }
 
     object LocationWidget : LibraryArtifact {
       override val artifactId = "contrib-locationwidget"
-      override val version = "0.1.0-alpha01-preview2-SNAPSHOT"
+      override val version = "0.1.0-alpha01-preview3-SNAPSHOT"
       override val name =
         "Android FHIR Structured Data Capture - Location Widget Extensions (contrib)"
     }
@@ -156,11 +156,8 @@ fun Project.publishArtifact(artifact: LibraryArtifact) {
               }
             }
             maven {
-              credentials(PasswordCredentials::class) {
-                username = ""
-                password = ""
-              }
-              url = uri("https://central.sonatype.com/repository/maven-snapshots")
+              credentials(PasswordCredentials::class)
+              url = uri("https://oss.sonatype.org/content/repositories/snapshots")
               name = "sonatype"
             }
           }
