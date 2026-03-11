@@ -18,5 +18,27 @@ kotlin {
   iosArm64()
   iosSimulatorArm64()
 
-  sourceSets { commonMain { dependencies { implementation(libs.kotlinx.coroutines.core) } } }
+  targets.configureEach {
+    compilations.configureEach {
+      compilerOptions.configure {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+        optIn.addAll(
+          "kotlin.time.ExperimentalTime",
+          "kotlin.uuid.ExperimentalUuidApi",
+        )
+      }
+    }
+  }
+
+  sourceSets {
+    commonMain {
+      dependencies {
+        implementation(libs.kotlinx.coroutines.core)
+        implementation(libs.kotlinx.datetime)
+        implementation(libs.kotlinx.serialization.json)
+        implementation(libs.kotlin.fhir)
+        implementation(libs.kermit)
+      }
+    }
+  }
 }
