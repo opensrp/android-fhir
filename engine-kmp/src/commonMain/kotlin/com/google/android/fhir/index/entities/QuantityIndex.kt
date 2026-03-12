@@ -14,13 +14,19 @@
  * limitations under the License.
  */
 
-package com.google.android.fhir.search
+package com.google.android.fhir.index.entities
 
-import com.google.fhir.model.r4.terminologies.ResourceType
+import com.ionspin.kotlin.bignum.decimal.BigDecimal
 
-// TODO: Phase 3 — Full search DSL implementation
-/** Specifies search criteria for querying the FHIR database. */
-class Search(val type: ResourceType)
-
-internal const val LOCAL_LAST_UPDATED = "local_lastUpdated"
-internal const val LAST_UPDATED = "_lastUpdated"
+/**
+ * An index record for a quantity value in a resource.
+ *
+ * See https://hl7.org/FHIR/search.html#quantity.
+ */
+internal data class QuantityIndex(
+  val name: String,
+  val path: String,
+  val system: String,
+  val code: String,
+  val value: BigDecimal,
+)

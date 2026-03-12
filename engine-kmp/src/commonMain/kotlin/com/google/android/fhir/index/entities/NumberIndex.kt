@@ -14,13 +14,20 @@
  * limitations under the License.
  */
 
-package com.google.android.fhir.search
+package com.google.android.fhir.index.entities
 
-import com.google.fhir.model.r4.terminologies.ResourceType
+import com.ionspin.kotlin.bignum.decimal.BigDecimal
 
-// TODO: Phase 3 — Full search DSL implementation
-/** Specifies search criteria for querying the FHIR database. */
-class Search(val type: ResourceType)
-
-internal const val LOCAL_LAST_UPDATED = "local_lastUpdated"
-internal const val LAST_UPDATED = "_lastUpdated"
+/**
+ * An index record for a number value in a resource.
+ *
+ * See https://hl7.org/FHIR/search.html#number.
+ */
+internal data class NumberIndex(
+  /** The name of the number index, e.g. "probability". */
+  val name: String,
+  /** The path of the number index, e.g. "RiskAssessment.prediction.probability". */
+  val path: String,
+  /** The value of the number index, e.g. "0.1". */
+  val value: BigDecimal,
+)

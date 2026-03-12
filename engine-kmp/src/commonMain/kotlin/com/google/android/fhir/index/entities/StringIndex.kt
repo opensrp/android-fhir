@@ -14,13 +14,18 @@
  * limitations under the License.
  */
 
-package com.google.android.fhir.search
+package com.google.android.fhir.index.entities
 
-import com.google.fhir.model.r4.terminologies.ResourceType
-
-// TODO: Phase 3 — Full search DSL implementation
-/** Specifies search criteria for querying the FHIR database. */
-class Search(val type: ResourceType)
-
-internal const val LOCAL_LAST_UPDATED = "local_lastUpdated"
-internal const val LAST_UPDATED = "_lastUpdated"
+/**
+ * An index record for a string value in a resource.
+ *
+ * See https://hl7.org/FHIR/search.html#string.
+ */
+internal data class StringIndex(
+  /** The name of the string index, e.g. "given". */
+  val name: String,
+  /** The path of the string index, e.g. "Patient.name.given". */
+  val path: String,
+  /** The value of the string index, e.g. "Tom". */
+  val value: String,
+)

@@ -66,3 +66,12 @@ fun getResourceClass(resourceType: String): KClass<out Resource> {
 /** Returns the [KClass] for the given [ResourceType]. */
 fun getResourceClass(resourceType: ResourceType): KClass<out Resource> =
   getResourceClass(resourceType.name)
+
+/**
+ * Returns the FHIR resource type name string for this [Resource] (e.g., "Patient", "Observation").
+ *
+ * This uses the Kotlin class simple name which matches the FHIR resource type name for all
+ * kotlin-fhir model classes.
+ */
+internal val Resource.resourceType: String
+  get() = this::class.simpleName ?: error("Cannot determine resource type for $this")

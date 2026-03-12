@@ -37,6 +37,7 @@ kotlin {
         implementation(libs.kotlinx.datetime)
         implementation(libs.kotlinx.serialization.json)
         implementation(libs.kotlin.fhir)
+        implementation(libs.fhir.path)
         implementation(libs.kermit)
       }
     }
