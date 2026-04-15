@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2025 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -110,6 +110,15 @@ object Releases {
 
 fun Project.publishArtifact(artifact: LibraryArtifact) {
   val variantToPublish = "release"
+  val githubActions = project.providers.environmentVariable("GITHUB_ACTIONS").isPresent
+  val artifactVersionSuffix = System.getenv("ARTIFACT_VERSION_SUFFIX")
+  val publishVersion =
+    if (githubActions && !artifactVersionSuffix.isNullOrBlank()) {
+      "${artifact.version}-$artifactVersionSuffix"
+    } else {
+      artifact.version
+    }
+
   project.extensions
     .getByType<com.android.build.gradle.LibraryExtension>()
     .publishing
@@ -120,7 +129,7 @@ fun Project.publishArtifact(artifact: LibraryArtifact) {
         register<MavenPublication>(variantToPublish) {
           groupId = Releases.groupId
           artifactId = artifact.artifactId
-          version = artifact.version
+          version = publishVersion
           from(components[variantToPublish])
           pom {
             name.set(artifact.name)
@@ -131,36 +140,37 @@ fun Project.publishArtifact(artifact: LibraryArtifact) {
               }
             }
           }
-          repositories {
-            maven {
-              name = "CI"
-              url =
-                if (System.getenv("REPOSITORY_URL") != null) {
-                  // REPOSITORY_URL is defined in .github/workflows/build.yml
-                  uri(System.getenv("REPOSITORY_URL"))
-                } else {
-                  uri("file://${rootProject.buildDir}/ci-repo")
-                }
-              version =
-                if (project.providers.environmentVariable("GITHUB_ACTIONS").isPresent) {
-                  // ARTIFACT_VERSION_SUFFIX is defined in .github/workflows/build.yml
-                  "${artifact.version}-${System.getenv("ARTIFACT_VERSION_SUFFIX")}"
-                } else {
-                  artifact.version
-                }
-              if (System.getenv("GITHUB_TOKEN") != null) {
-                credentials {
-                  username = System.getenv("GITHUB_ACTOR")
-                  password = System.getenv("GITHUB_TOKEN")
-                }
-              }
+        }
+      }
+
+      repositories {
+        maven {
+          name = "CI"
+          url =
+            if (System.getenv("REPOSITORY_URL") != null) {
+              // REPOSITORY_URL is defined in .github/workflows/build.yml
+              uri(System.getenv("REPOSITORY_URL"))
+            } else {
+              uri("file://${rootProject.buildDir}/ci-repo")
             }
-            maven {
-              credentials(PasswordCredentials::class)
-              url = uri("https://oss.sonatype.org/content/repositories/snapshots")
-              name = "sonatype"
+          if (System.getenv("GITHUB_TOKEN") != null) {
+            credentials {
+              username = System.getenv("GITHUB_ACTOR")
+              password = System.getenv("GITHUB_TOKEN")
             }
           }
+        }
+
+        maven {
+          name = "CentralSnapshots"
+          url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+          credentials(PasswordCredentials::class)
+        }
+
+        maven {
+          name = "Central"
+          url = uri("https://central.sonatype.com/api/v1/publisher")
+          credentials(PasswordCredentials::class)
         }
       }
     }
