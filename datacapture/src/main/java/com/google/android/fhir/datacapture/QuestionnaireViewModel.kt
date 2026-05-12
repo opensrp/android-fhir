@@ -392,7 +392,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
           )
       }
       modifiedQuestionnaireResponseItemSet.add(questionnaireResponseItem)
-      withContext(Dispatchers.IO) {
+      viewModelScope.launch (Dispatchers.IO) {
         var isReferenced = false
         val flattenedQuestionnaireComponentItems = questionnaire.item.flattened()
         kotlin.run {
@@ -693,7 +693,6 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       .forEach { (questionnaireItem, calculatedAnswers) ->
         // update all response item with updated values
         questionnaireResponse.allItems
-          .asSequence()
           // Item answer should not be modified and touched by user;
           // https://build.fhir.org/ig/HL7/sdc/StructureDefinition-sdc-questionnaire-calculatedExpression.html
           .filter {
