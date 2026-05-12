@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2024 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import com.google.android.fhir.datacapture.extensions.EXTENSION_CALCULATED_EXPRE
 import com.google.android.fhir.datacapture.extensions.EXTENSION_VARIABLE_URL
 import com.google.android.fhir.datacapture.extensions.answerExpression
 import com.google.android.fhir.datacapture.extensions.asStringValue
+import com.google.android.fhir.datacapture.extensions.flattened
 import com.google.android.fhir.datacapture.extensions.variableExpressions
 import com.google.common.truth.Truth.assertThat
 import java.util.Calendar
@@ -687,6 +688,7 @@ class ExpressionEvaluatorTest {
 
     val result =
       expressionEvaluator.evaluateAllAffectedCalculatedExpressions(
+        questionnaire.item.flattened(),
         questionnaire.item.elementAt(1),
       )
 
@@ -758,6 +760,7 @@ class ExpressionEvaluatorTest {
 
       val result =
         expressionEvaluator.evaluateAllAffectedCalculatedExpressions(
+          questionnaire.item.flattened(),
           questionnaire.item.elementAt(1),
         )
 
@@ -795,6 +798,7 @@ class ExpressionEvaluatorTest {
 
       val result =
         expressionEvaluator.evaluateAllAffectedCalculatedExpressions(
+          questionnaire.item.flattened(),
           questionnaire.item.elementAt(0),
         )
 
@@ -831,6 +835,7 @@ class ExpressionEvaluatorTest {
 
       val result =
         expressionEvaluator.evaluateAllAffectedCalculatedExpressions(
+          questionnaire.item.flattened(),
           questionnaire.item.elementAt(0),
         )
 

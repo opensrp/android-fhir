@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2025 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,6 +66,7 @@ interface FhirEngine {
    * [create], the resource created in `FhirEngine` will have the same `id`. If no `id` is
    * specified, `FhirEngine` will generate a UUID as that resource's `id` and include it in the
    * returned list of IDs.
+   *
    * @param resource The FHIR resources to create.
    * @param isLocalOnly - Setting the value to [true] instructs engine that the resource and its
    *   subsequent updates should never be synced to the server.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2024 Google LLC
+ * Copyright 2022-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,9 @@ import com.google.android.fhir.datacapture.views.HeaderView
 import com.google.android.fhir.datacapture.views.QuestionnaireViewItem
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 internal abstract class EditTextViewHolderFactory(@LayoutRes override val resId: Int) :
@@ -131,9 +134,17 @@ abstract class QuestionnaireItemEditTextViewHolderDelegate(private val rawInputT
       }
 
       // TextWatcher is set only once for each question item in scenario 1
+      var handleInputJob: Job? = null
       textWatcher =
         textInputEditText.doAfterTextChanged { editable: Editable? ->
-          context.lifecycleScope.launch { handleInput(editable!!, questionnaireViewItem) }
+          // Cancel the previous job if user types again
+          handleInputJob?.cancel()
+
+          handleInputJob =
+            context.lifecycleScope.launch {
+              delay(800.milliseconds)
+              handleInput(editable!!, questionnaireViewItem)
+            }
         }
     }
   }
