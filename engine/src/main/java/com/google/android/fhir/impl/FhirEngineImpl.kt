@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2025 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,9 @@ import org.hl7.fhir.r4.model.ResourceType
 internal class FhirEngineImpl(private val database: Database, private val context: Context) :
   FhirEngine {
   override suspend fun create(vararg resource: Resource, isLocalOnly: Boolean): List<String> {
-    return withContext(Dispatchers.IO) { if (isLocalOnly) database.insertLocalOnly(*resource) else database.insert(*resource) }
+    return withContext(Dispatchers.IO) {
+      if (isLocalOnly) database.insertLocalOnly(*resource) else database.insert(*resource)
+    }
   }
 
   override suspend fun get(type: ResourceType, id: String) =

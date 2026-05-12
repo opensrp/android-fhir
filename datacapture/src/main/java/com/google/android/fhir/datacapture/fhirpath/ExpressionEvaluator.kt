@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2024 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -192,10 +192,10 @@ internal class ExpressionEvaluator(
    * calculated expression extension, which is dependent on value of updated response
    */
   suspend fun evaluateAllAffectedCalculatedExpressions(
+    flattenedQuestionnaireComponentItems: List<QuestionnaireItemComponent>,
     questionnaireItem: QuestionnaireItemComponent,
   ): List<ItemToAnswersPair> {
-    return questionnaire.item
-      .flattened()
+    return flattenedQuestionnaireComponentItems
       .filter { item ->
         // Condition 1. item is calculable
         // Condition 2. item answer depends on the updated item answer OR has a variable dependency
@@ -293,6 +293,7 @@ internal class ExpressionEvaluator(
   ): MutableMap<String, Base?> {
     questionnaireLaunchContextMap?.let { variablesMap.putAll(it) }
     findDependentVariables(expression)
+      .asSequence()
       .filterNot { variable -> reservedItemVariables.contains(variable) }
       .forEach { variableName ->
         if (variablesMap[variableName] == null) {
@@ -365,7 +366,7 @@ internal class ExpressionEvaluator(
       questionnaireLaunchContextMap
         ?.toMutableMap()
         .takeIf { !it.isNullOrEmpty() }
-        ?.also { it.put(questionnaireFhirPathSupplement, questionnaire) }
+        ?.also { it[questionnaireFhirPathSupplement] = questionnaire }
         ?.let { evaluateXFhirEnhancement(expression, it) }
         ?: emptySequence()
 
@@ -409,9 +410,9 @@ internal class ExpressionEvaluator(
         // See : http://build.fhir.org/ig/HL7/sdc/extraction.html#structuremap-based-extraction
         if (evaluatedResult.isEmpty()) {
           Timber.w(
+            "%sreplaced with a blank string.",
             "$fhirPath evaluated to null. The expression is either invalid, or the " +
-              "expression returned no, or more than one resource. The expression will be " +
-              "replaced with a blank string.",
+              "expression returned no, or more than one resource. The expression will be ",
           )
         }
         fhirPathWithParentheses to evaluatedResult
@@ -529,7 +530,7 @@ internal class ExpressionEvaluator(
         )
       }
     } catch (exception: FHIRException) {
-      Timber.w("Could not evaluate expression with FHIRPathEngine", exception)
+      Timber.w(exception, "Could not evaluate expression with FHIRPathEngine")
       null
     }
 }

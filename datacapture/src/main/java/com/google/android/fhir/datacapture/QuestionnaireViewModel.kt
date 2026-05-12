@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2025 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,6 +86,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.hl7.fhir.r4.model.DateTimeType
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.Questionnaire.QuestionnaireItemComponent
@@ -391,13 +392,14 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
           )
       }
       modifiedQuestionnaireResponseItemSet.add(questionnaireResponseItem)
-      viewModelScope.launch(Dispatchers.IO) {
+      withContext(Dispatchers.IO) {
         var isReferenced = false
+        val flattenedQuestionnaireComponentItems = questionnaire.item.flattened()
         kotlin.run {
           isReferenced = questionnaireItem.isExpressionReferencedBy(questionnaire)
           if (isReferenced) return@run
 
-          questionnaire.item.flattened().forEach { item ->
+          flattenedQuestionnaireComponentItems.forEach { item ->
             isReferenced = questionnaireItem.isEnableWhenReferencedBy(item)
             if (isReferenced) return@run
 
@@ -408,7 +410,10 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
         if (isReferenced) isLoadingNextPage.value = true
         modificationCount.update { it + 1 }
 
-        updateAnswerWithAffectedCalculatedExpression(questionnaireItem)
+        updateAnswerWithAffectedCalculatedExpression(
+          flattenedQuestionnaireComponentItems,
+          questionnaireItem,
+        )
         pages = getQuestionnairePages()
         isLoadingNextPage.value = false
         modificationCount.update { it + 1 }
@@ -677,15 +682,18 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
    *   [calculatedExpression].
    */
   private suspend fun updateAnswerWithAffectedCalculatedExpression(
+    flattenedQuestionnaireComponentItems: List<QuestionnaireItemComponent>,
     questionnaireItem: QuestionnaireItemComponent,
   ) {
     expressionEvaluator
       .evaluateAllAffectedCalculatedExpressions(
+        flattenedQuestionnaireComponentItems,
         questionnaireItem,
       )
       .forEach { (questionnaireItem, calculatedAnswers) ->
         // update all response item with updated values
         questionnaireResponse.allItems
+          .asSequence()
           // Item answer should not be modified and touched by user;
           // https://build.fhir.org/ig/HL7/sdc/StructureDefinition-sdc-questionnaire-calculatedExpression.html
           .filter {
@@ -732,7 +740,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
     }
   }
 
-  private fun removeDisabledAnswers(
+  private suspend fun removeDisabledAnswers(
     questionnaireItem: QuestionnaireItemComponent,
     questionnaireResponseItem: QuestionnaireResponseItemComponent,
     disabledAnswers: List<QuestionnaireResponseItemAnswerComponent>,
@@ -741,9 +749,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       questionnaireResponseItem.answer.filterNot { ans ->
         disabledAnswers.any { ans.value.equalsDeep(it.value) }
       }
-    viewModelScope.launch {
-      answersChangedCallback(questionnaireItem, questionnaireResponseItem, validAnswers, null)
-    }
+    answersChangedCallback(questionnaireItem, questionnaireResponseItem, validAnswers, null)
   }
 
   /**
