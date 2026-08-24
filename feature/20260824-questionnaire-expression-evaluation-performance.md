@@ -82,6 +82,9 @@ they reference are fixed for the lifetime of the rendered `Questionnaire`.
   items are re-evaluated when an answer changes, instead of re-evaluating the whole tree. That is a
   behavioral change to when the UI updates and belongs in its own proposal; this change deliberately
   keeps the existing "recompute everything" model and only makes each recomputation cheap.
+- **Results are memoized within a state computation, never across one.** Across computations the
+  answers change and a memoized result would need invalidating, which is the dependency graph
+  again. Within one computation they do not change - see §4.1 - so results can be shared.
 - **Cache parsed expressions globally, not per questionnaire.** Parsing is a pure function of the
   expression string and independent of engine state, so a process-wide LRU is both correct and more
   effective (shared across questionnaire launches) than a per-`ExpressionEvaluator` cache.
@@ -103,6 +106,60 @@ they reference are fixed for the lifetime of the rendered `Questionnaire`.
 | Per-questionnaire dependency index | `datacapture/.../fhirpath/ExpressionEvaluator.kt` — `calculatedExpressionItems` (flattened calculable items, `by lazy`) and `calculatedExpressionItemDependencies` (parallel list of `CalculatedExpressionDependencies(referencedLinkIds, dependsOnVariables)`, `by lazy`). |
 | Per-answer scan | Same file — `evaluateAllAffectedCalculatedExpressions` filters `calculatedExpressionItems` by index against the precomputed dependencies. |
 | Cycle detection | Same file — `detectExpressionCyclicDependency` extracts referenced link IDs once per calculable item, indexes item positions by referenced link ID, and checks only real edges. |
+| Per-computation memo | `datacapture/.../fhirpath/QuestionnaireExpressionCache.kt` (new) — expression results keyed by expression text, plus questionnaire level variable values keyed by name. Off by default; `activate` / `deactivate` / `invalidate`. |
+| Memo lifetime | `QuestionnaireViewModel` owns the single cache instance and hands it to `EnablementEvaluator` (both construction sites) and `EnabledAnswerOptionsEvaluator`, the two evaluators that run once per item. Activated for the span of `getQuestionnaireState`, invalidated by the two disabled-answer edits. |
+| Sharing rule | `ExpressionEvaluator.sharableResultKey` / `isAnchoredAtVariable` / `isItemScopedVariable`. See §4.2. |
+
+### 4.1 Why memoizing within a state computation is sound
+
+A questionnaire state computation reads answers; it does not write them. The only writers are
+calculated expressions, and they run *between* computations, never inside one:
+`initializeCalculatedExpressions` runs from the state flow's `onEach`, and
+`updateAnswerWithAffectedCalculatedExpression` from the answer-change handler. The cache is
+therefore switched on for exactly the span of one computation and switched off again:
+
+```kotlin
+private suspend fun getQuestionnaireState(): QuestionnaireState =
+  try {
+    expressionCache.activate()
+    computeQuestionnaireState()
+  } finally {
+    expressionCache.deactivate()
+  }
+```
+
+Everything evaluated outside that span - `getEnabledResponseItems`, `getQuestionnairePages`, all
+calculated expression evaluation - runs with the cache inactive and is unchanged.
+
+Two answer edits *can* happen during a computation, both on enable/disable transitions only:
+`cacheDisabledQuestionnaireItemAnswers` clears a newly disabled item's answers, and
+`restoreFromDisabledQuestionnaireItemAnswersCache` puts them back. Both call
+`QuestionnaireExpressionCache.invalidate()`, and only when they actually mutate, so the steady state
+where the quadratic cost lives is unaffected. (`removeDisabledAnswers` needs no such call: it posts
+`answersChangedCallback` to `viewModelScope`, so its edit lands after the computation.)
+
+### 4.2 When a result may be shared between items
+
+`ExpressionEvaluator.sharableResultKey` returns the expression text as the key, or `null` when the
+result depends on the item it is evaluated for and so must not be shared. It is `null` when:
+
+- the expression mentions `%qItem` or `%context` - those *are* the item;
+- any path in it resolves against the evaluation base, i.e. the item's own questionnaire response
+  item. Decided by walking the parsed `ExpressionNode`: at a path start, `Constant` (`%resource…`)
+  is anchored and `Group` recurses into its contents, while `Name` and `Function` resolve against
+  the base. `opNext` is another path start, so `A or B` requires both to be anchored. Nodes reached
+  through `inner` or through a function's parameters need no check - they resolve against what
+  precedes them, already established as anchored;
+- it reads a variable declared on the item or one of its ancestors, shadowing the questionnaire
+  level one of the same name.
+
+Questionnaire level variables get their own memo, keyed by name, since they evaluate to the same
+value for every item. `hasCachedQuestionnaireVariable` is separate from `cachedQuestionnaireVariable`
+because a variable can legitimately evaluate to `null`.
+
+A root position function is conservatively treated as item specific: its focus *is* the base, so
+`iif(…)`-rooted expressions are not shared. That costs little in practice - such expressions are
+typically variable definitions, and variables are memoized separately.
 
 ### 5. Cost model
 
@@ -117,6 +174,8 @@ Per **answer change**, with *n* = calculable items, *e* = expression-based exten
 | | Before | After |
 |---|---|---|
 | `evaluateAllAffectedCalculatedExpressions` | flatten tree + O(n·e) regex compiles + O(n) variable-regex scans | O(n) set lookups |
+| enableWhen / answer option evaluation | one full FHIRPath evaluation per item, each `%resource.repeat(item)` walking the whole response — O(items²) | one evaluation per *distinct anchored expression*; items sharing an expression share the result |
+| questionnaire level variables | re-evaluated once per referencing expression | evaluated once per state computation |
 | `QuestionnaireViewModel.isReferenced` scan | flatten tree + O(n·e) regex compiles | flatten tree + O(n·e) set builds (regex compilation gone; see §8) |
 
 Per **questionnaire load**:
@@ -186,6 +245,18 @@ Left untouched on purpose — each changes *when* the UI updates and needs its o
 - `expressionReferencedLinkIds should return link ids of all expression based extensions` — across
   `calculatedExpression` and `enableWhenExpression`, ignoring non-expression extensions.
 - `expressionReferencedLinkIds should return empty set for expression without reference`.
+
+`datacapture/src/test/.../fhirpath/ExpressionEvaluatorTest.kt` (memoization):
+- `should not share a result between items when the expression resolves against the item` — a bare
+  relative path (`linkId`) evaluated for two items returns each item's own value.
+- `should not share a result of an expression using the qItem supplement`.
+- `should not share a result depending on a variable declared on the item` — an item level
+  `%shadowed` beats the questionnaire level one of the same name.
+- `should reuse the result of a questionnaire anchored expression while the cache is active` —
+  documents the frozen-answer contract; the mid-run edit it makes cannot occur during a real state
+  computation and only exists to make the reuse observable.
+- `should not reuse any result while the cache is inactive` — the complement, proving the cache is
+  genuinely off outside a state computation.
 
 Pre-existing test defect fixed as part of this change: `MoreQuestionnaireItemComponentsTest` called
 `item2.isReferencedBy(item1)` in two tests, and no such function exists anywhere in the repository —

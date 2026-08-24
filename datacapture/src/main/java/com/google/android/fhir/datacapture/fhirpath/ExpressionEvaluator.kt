@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2024 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,6 +64,7 @@ internal class ExpressionEvaluator(
     emptyMap(),
   private val questionnaireLaunchContextMap: Map<String, Resource>? = emptyMap(),
   private val xFhirQueryResolver: XFhirQueryResolver? = null,
+  private val expressionCache: QuestionnaireExpressionCache = QuestionnaireExpressionCache(),
 ) {
 
   private val reservedItemVariables =
@@ -183,13 +184,80 @@ internal class ExpressionEvaluator(
     questionnaireResponseItem: QuestionnaireResponseItemComponent?,
     expression: Expression,
   ): List<Base> {
+    val cacheKey =
+      if (expressionCache.isActive) sharableResultKey(questionnaireItem, expression) else null
+    cacheKey?.let { key ->
+      expressionCache.cachedResult(key)?.let {
+        return it
+      }
+    }
+
     val appContext = extractItemDependentVariables(expression, questionnaireItem)
-    return evaluateToBase(
-      questionnaireResponse,
-      questionnaireResponseItem,
-      expression.expression,
-      appContext,
-    )
+    val result =
+      evaluateToBase(
+        questionnaireResponse,
+        questionnaireResponseItem,
+        expression.expression,
+        appContext,
+      )
+    cacheKey?.let { expressionCache.cacheResult(it, result) }
+    return result
+  }
+
+  /**
+   * The key under which the result of evaluating [expression] can be shared with the other
+   * questionnaire items evaluating the same expression, or `null` when the result depends on
+   * [questionnaireItem] and so cannot be shared.
+   *
+   * The result depends on the item when the expression reads the item through a FHIRPath
+   * supplement, when any path in it resolves against the evaluation base - which is the item's own
+   * questionnaire response item - or when it reads a variable that the item or one of its ancestors
+   * declares, shadowing the questionnaire level one.
+   */
+  private fun sharableResultKey(
+    questionnaireItem: QuestionnaireItemComponent,
+    expression: Expression,
+  ): String? {
+    val expressionText = expression.expression ?: return null
+    if (
+      expressionText.contains("%$questionnaireItemFhirPathSupplement") ||
+        expressionText.contains("%context")
+    ) {
+      return null
+    }
+    if (!isAnchoredAtVariable(extractExpressionNode(expressionText))) return null
+    if (findDependentVariables(expression).any { isItemScopedVariable(it, questionnaireItem) }) {
+      return null
+    }
+    return expressionText
+  }
+
+  private fun isItemScopedVariable(
+    variableName: String,
+    questionnaireItem: QuestionnaireItemComponent,
+  ) =
+    questionnaireItem.findVariableExpression(variableName) != null ||
+      findVariableInAncestors(variableName, questionnaireItem) != null
+
+  /**
+   * Whether every path in [node] that would otherwise resolve against the evaluation base is
+   * instead anchored at a variable, e.g. `%resource`. Only such an expression evaluates to the same
+   * value whichever item it is evaluated for.
+   *
+   * A [ExpressionNode.Kind.Name] or [ExpressionNode.Kind.Function] node in this position resolves
+   * against the base and makes the expression item specific. Nodes reached through `inner` or
+   * through a function's parameters do not need checking: they resolve against the result of what
+   * precedes them, which this function has already established is anchored.
+   */
+  private fun isAnchoredAtVariable(node: ExpressionNode?): Boolean {
+    if (node == null) return true
+    val anchored =
+      when (node.kind) {
+        ExpressionNode.Kind.Constant -> true
+        ExpressionNode.Kind.Group -> isAnchoredAtVariable(node.group)
+        else -> false
+      }
+    return anchored && isAnchoredAtVariable(node.opNext)
   }
 
   /**
@@ -479,10 +547,17 @@ internal class ExpressionEvaluator(
           )
         } // Finally, check the variables defined on the questionnaire itself
           ?: questionnaire.findVariableExpression(variableName)?.let { expression ->
-          evaluateQuestionnaireVariableExpression(
-            expression,
-            variablesMap,
-          )
+          // A questionnaire level variable evaluates to the same value for every item, so within a
+          // single questionnaire state computation it only has to be evaluated once.
+          if (expressionCache.hasCachedQuestionnaireVariable(variableName)) {
+            expressionCache.cachedQuestionnaireVariable(variableName)
+          } else {
+            evaluateQuestionnaireVariableExpression(
+                expression,
+                variablesMap,
+              )
+              .also { expressionCache.cacheQuestionnaireVariable(variableName, it) }
+          }
         }
 
     evaluatedValue?.also { variablesMap[variableName] = it }

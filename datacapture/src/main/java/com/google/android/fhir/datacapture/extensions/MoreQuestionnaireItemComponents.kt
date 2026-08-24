@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2025 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -743,8 +743,8 @@ private val LINK_ID_REFERENCE_REGEX = Regex("linkId='([^']*)'")
  * this element, e.g. `this-question` for an expression
  * `%resource.item.where(linkId='this-question')`.
  *
- * Callers that test the same element repeatedly, e.g. once per answer the user gives, should hold on
- * to the returned set instead of recomputing it.
+ * Callers that test the same element repeatedly, e.g. once per answer the user gives, should hold
+ * on to the returned set instead of recomputing it.
  */
 private fun List<Extension>.expressionReferencedLinkIds(): Set<String> =
   flatMapTo(mutableSetOf()) { extension ->

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2024 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ import org.hl7.fhir.r4.model.Practitioner
 import org.hl7.fhir.r4.model.Quantity
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.QuestionnaireResponse
+import org.hl7.fhir.r4.model.StringType
 import org.hl7.fhir.r4.model.Type
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -1239,5 +1240,231 @@ class ExpressionEvaluatorTest {
 
       assertThat(result).isEqualTo("Patient?address-city=1&gender=2")
     }
+  }
+
+  @Test
+  fun `evaluateExpression() should not share a result between items when the expression resolves against the item`() =
+    runBlocking {
+      // `linkId` is a relative path, so it resolves against the questionnaire response item the
+      // expression is evaluated for. Such a result must never be shared between items.
+      val (questionnaire, questionnaireResponse) = twoItemQuestionnaire()
+      val cache = QuestionnaireExpressionCache().apply { activate() }
+      val expressionEvaluator =
+        ExpressionEvaluator(
+          questionnaire,
+          questionnaireResponse,
+          expressionCache = cache,
+        )
+      val expression =
+        Expression().apply {
+          language = "text/fhirpath"
+          this.expression = "linkId"
+        }
+
+      val first =
+        expressionEvaluator.evaluateExpression(
+          questionnaire.item[0],
+          questionnaireResponse.item[0],
+          expression,
+        )
+      val second =
+        expressionEvaluator.evaluateExpression(
+          questionnaire.item[1],
+          questionnaireResponse.item[1],
+          expression,
+        )
+
+      assertThat(first.single().primitiveValue()).isEqualTo("a")
+      assertThat(second.single().primitiveValue()).isEqualTo("b")
+    }
+
+  @Test
+  fun `evaluateExpression() should not share a result of an expression using the qItem supplement`() =
+    runBlocking {
+      val (questionnaire, questionnaireResponse) = twoItemQuestionnaire()
+      val cache = QuestionnaireExpressionCache().apply { activate() }
+      val expressionEvaluator =
+        ExpressionEvaluator(
+          questionnaire,
+          questionnaireResponse,
+          expressionCache = cache,
+        )
+      val expression =
+        Expression().apply {
+          language = "text/fhirpath"
+          this.expression = "%qItem.linkId"
+        }
+
+      val first =
+        expressionEvaluator.evaluateExpression(
+          questionnaire.item[0],
+          questionnaireResponse.item[0],
+          expression,
+        )
+      val second =
+        expressionEvaluator.evaluateExpression(
+          questionnaire.item[1],
+          questionnaireResponse.item[1],
+          expression,
+        )
+
+      assertThat(first.single().primitiveValue()).isEqualTo("a")
+      assertThat(second.single().primitiveValue()).isEqualTo("b")
+    }
+
+  @Test
+  fun `evaluateExpression() should reuse the result of a questionnaire anchored expression while the cache is active`() =
+    runBlocking {
+      // Documents the contract the cache relies on: while a questionnaire state is being computed
+      // the answers it reads do not change, so the same anchored expression may be evaluated once
+      // and its result shared. The mid-run edit below cannot happen during a real state
+      // computation, and is only here to make the reuse observable.
+      val (questionnaire, questionnaireResponse) = twoItemQuestionnaire()
+      val cache = QuestionnaireExpressionCache().apply { activate() }
+      val expressionEvaluator =
+        ExpressionEvaluator(
+          questionnaire,
+          questionnaireResponse,
+          expressionCache = cache,
+        )
+      val expression =
+        Expression().apply {
+          language = "text/fhirpath"
+          this.expression = "%resource.repeat(item).where(linkId='a').answer.value"
+        }
+
+      val first =
+        expressionEvaluator.evaluateExpression(
+          questionnaire.item[0],
+          questionnaireResponse.item[0],
+          expression,
+        )
+      questionnaireResponse.item[0].answer[0].value = StringType("changed")
+      val second =
+        expressionEvaluator.evaluateExpression(
+          questionnaire.item[1],
+          questionnaireResponse.item[1],
+          expression,
+        )
+
+      assertThat(first.single().primitiveValue()).isEqualTo("original")
+      assertThat(second.single().primitiveValue()).isEqualTo("original")
+    }
+
+  @Test
+  fun `evaluateExpression() should not reuse any result while the cache is inactive`() =
+    runBlocking {
+      val (questionnaire, questionnaireResponse) = twoItemQuestionnaire()
+      val expressionEvaluator = ExpressionEvaluator(questionnaire, questionnaireResponse)
+      val expression =
+        Expression().apply {
+          language = "text/fhirpath"
+          this.expression = "%resource.repeat(item).where(linkId='a').answer.value"
+        }
+
+      val first =
+        expressionEvaluator.evaluateExpression(
+          questionnaire.item[0],
+          questionnaireResponse.item[0],
+          expression,
+        )
+      questionnaireResponse.item[0].answer[0].value = StringType("changed")
+      val second =
+        expressionEvaluator.evaluateExpression(
+          questionnaire.item[1],
+          questionnaireResponse.item[1],
+          expression,
+        )
+
+      assertThat(first.single().primitiveValue()).isEqualTo("original")
+      assertThat(second.single().primitiveValue()).isEqualTo("changed")
+    }
+
+  @Test
+  fun `evaluateExpression() should not share a result depending on a variable declared on the item`() =
+    runBlocking {
+      // %shadowed is declared both on the questionnaire and on item b, so the two items must not
+      // share the result even though the expression text is identical.
+      val (questionnaire, questionnaireResponse) = twoItemQuestionnaire()
+      questionnaire.addExtension(
+        EXTENSION_VARIABLE_URL,
+        Expression().apply {
+          name = "shadowed"
+          language = "text/fhirpath"
+          this.expression = "'questionnaire level'"
+        },
+      )
+      questionnaire.item[1].addExtension(
+        EXTENSION_VARIABLE_URL,
+        Expression().apply {
+          name = "shadowed"
+          language = "text/fhirpath"
+          this.expression = "'item level'"
+        },
+      )
+      val cache = QuestionnaireExpressionCache().apply { activate() }
+      val expressionEvaluator =
+        ExpressionEvaluator(
+          questionnaire,
+          questionnaireResponse,
+          expressionCache = cache,
+        )
+      val expression =
+        Expression().apply {
+          language = "text/fhirpath"
+          this.expression = "%shadowed"
+        }
+
+      val first =
+        expressionEvaluator.evaluateExpression(
+          questionnaire.item[0],
+          questionnaireResponse.item[0],
+          expression,
+        )
+      val second =
+        expressionEvaluator.evaluateExpression(
+          questionnaire.item[1],
+          questionnaireResponse.item[1],
+          expression,
+        )
+
+      assertThat(first.single().primitiveValue()).isEqualTo("questionnaire level")
+      assertThat(second.single().primitiveValue()).isEqualTo("item level")
+    }
+
+  /** A questionnaire of two sibling items `a` and `b`, `a` answered with "original". */
+  private fun twoItemQuestionnaire(): Pair<Questionnaire, QuestionnaireResponse> {
+    val questionnaire =
+      Questionnaire().apply {
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "a"
+            type = Questionnaire.QuestionnaireItemType.STRING
+          },
+        )
+        addItem(
+          Questionnaire.QuestionnaireItemComponent().apply {
+            linkId = "b"
+            type = Questionnaire.QuestionnaireItemType.STRING
+          },
+        )
+      }
+    val questionnaireResponse =
+      QuestionnaireResponse().apply {
+        addItem(
+          QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
+            linkId = "a"
+            addAnswer(
+              QuestionnaireResponse.QuestionnaireResponseItemAnswerComponent().apply {
+                value = StringType("original")
+              },
+            )
+          },
+        )
+        addItem(
+          QuestionnaireResponse.QuestionnaireResponseItemComponent().apply { linkId = "b" },
+        )
+      }
+    return questionnaire to questionnaireResponse
   }
 }
