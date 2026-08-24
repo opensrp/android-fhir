@@ -18,9 +18,9 @@ package com.google.android.fhir.datacapture.fhirpath
 
 import com.google.android.fhir.datacapture.XFhirQueryResolver
 import com.google.android.fhir.datacapture.extensions.calculatedExpression
+import com.google.android.fhir.datacapture.extensions.expressionReferencedLinkIds
 import com.google.android.fhir.datacapture.extensions.findVariableExpression
 import com.google.android.fhir.datacapture.extensions.flattened
-import com.google.android.fhir.datacapture.extensions.isExpressionReferencedBy
 import com.google.android.fhir.datacapture.extensions.isFhirPath
 import com.google.android.fhir.datacapture.extensions.isXFhirQuery
 import com.google.android.fhir.datacapture.extensions.variableExpressions
@@ -125,23 +125,49 @@ internal class ExpressionEvaluator(
 
   /** Detects if any item into list is referencing a dependent item in its calculated expression */
   internal fun detectExpressionCyclicDependency(items: List<QuestionnaireItemComponent>) {
-    items
-      .flattened()
-      .filter { it.calculatedExpression != null }
-      .run {
-        forEach { current ->
-          // no calculable item depending on current item should be used as dependency into current
-          // item
-          this.forEach { dependent ->
-            check(
-              !(current.isExpressionReferencedBy(dependent) &&
-                dependent.isExpressionReferencedBy(current)),
-            ) {
-              "${current.linkId} and ${dependent.linkId} have cyclic dependency in expression based extension"
-            }
-          }
+    val calculableItems = items.flattened().filter { it.calculatedExpression != null }
+    // Index aligned with `calculableItems`, so that the link IDs each item references are extracted
+    // from its expressions once instead of once per pair of items.
+    val referencedLinkIds = calculableItems.map { it.expressionReferencedLinkIds }
+    val calculableItemIndicesByReferencedLinkId = mutableMapOf<String, MutableList<Int>>()
+    referencedLinkIds.forEachIndexed { index, linkIds ->
+      linkIds.forEach {
+        calculableItemIndicesByReferencedLinkId.getOrPut(it) { mutableListOf() }.add(index)
+      }
+    }
+
+    calculableItems.forEachIndexed { currentIndex, current ->
+      // no calculable item depending on current item should be used as dependency into current
+      // item
+      calculableItemIndicesByReferencedLinkId[current.linkId]?.forEach { dependentIndex ->
+        val dependent = calculableItems[dependentIndex]
+        check(!referencedLinkIds[currentIndex].contains(dependent.linkId)) {
+          "${current.linkId} and ${dependent.linkId} have cyclic dependency in expression based extension"
         }
       }
+    }
+  }
+
+  /**
+   * The items of [questionnaire] that have a calculated expression, in pre-order.
+   *
+   * Computed once, as [evaluateAllAffectedCalculatedExpressions] walks these items every time an
+   * answer changes. This assumes the expression based extensions of [questionnaire] do not change
+   * while this evaluator is in use, which holds because a new evaluator is created for every
+   * questionnaire being rendered.
+   */
+  private val calculatedExpressionItems: List<QuestionnaireItemComponent> by lazy {
+    questionnaire.item.flattened().filter { it.calculatedExpression != null }
+  }
+
+  /** The dependencies of each item in [calculatedExpressionItems], in the same order. */
+  private val calculatedExpressionItemDependencies: List<CalculatedExpressionDependencies> by lazy {
+    calculatedExpressionItems.map { item ->
+      CalculatedExpressionDependencies(
+        referencedLinkIds = item.expressionReferencedLinkIds,
+        dependsOnVariables = findDependentVariables(item.calculatedExpression!!).isNotEmpty(),
+      )
+    }
   }
 
   /**
@@ -194,14 +220,13 @@ internal class ExpressionEvaluator(
   suspend fun evaluateAllAffectedCalculatedExpressions(
     questionnaireItem: QuestionnaireItemComponent,
   ): List<ItemToAnswersPair> {
-    return questionnaire.item
-      .flattened()
-      .filter { item ->
-        // Condition 1. item is calculable
+    return calculatedExpressionItems
+      .filterIndexed { index, _ ->
+        // Condition 1. item is calculable, which every item in `calculatedExpressionItems` is
         // Condition 2. item answer depends on the updated item answer OR has a variable dependency
-        item.calculatedExpression != null &&
-          (questionnaireItem.isExpressionReferencedBy(item) ||
-            findDependentVariables(item.calculatedExpression!!).isNotEmpty())
+        val dependencies = calculatedExpressionItemDependencies[index]
+        dependencies.referencedLinkIds.contains(questionnaireItem.linkId) ||
+          dependencies.dependsOnVariables
       }
       .map { item ->
         // TODO: Pass the questionnaire response item corresponding to the
@@ -418,7 +443,9 @@ internal class ExpressionEvaluator(
       }
 
   private fun findDependentVariables(expression: Expression) =
-    variableRegex.findAll(expression.expression).map { it.groupValues[1] }.toList()
+    // `orEmpty` because the variables of every calculable item are now looked up up front, so a
+    // malformed expression without an expression string must not fail the whole questionnaire.
+    variableRegex.findAll(expression.expression.orEmpty()).map { it.groupValues[1] }.toList()
 
   /**
    * Finds the dependent variables at questionnaire item level first, then in ancestors and then at
@@ -546,3 +573,15 @@ private fun extractResourceType(expressionNode: ExpressionNode): String? {
 
 /** Pair of a [Questionnaire.QuestionnaireItemComponent] with its evaluated answers */
 internal typealias ItemToAnswersPair = Pair<QuestionnaireItemComponent, List<Type>>
+
+/**
+ * What the calculated expression of a [Questionnaire.QuestionnaireItemComponent] depends on, i.e.
+ * what has to change for the expression to need re-evaluating.
+ *
+ * @param referencedLinkIds the link IDs the item's expression based extensions refer to
+ * @param dependsOnVariables whether the item's calculated expression refers to any variable
+ */
+private data class CalculatedExpressionDependencies(
+  val referencedLinkIds: Set<String>,
+  val dependsOnVariables: Boolean,
+)

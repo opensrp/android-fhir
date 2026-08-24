@@ -1382,7 +1382,7 @@ class MoreQuestionnaireItemComponentsTest {
         )
       }
     val item2 = Questionnaire.QuestionnaireItemComponent().apply { linkId = "B" }
-    assertThat(item2.isReferencedBy(item1)).isTrue()
+    assertThat(item2.isExpressionReferencedBy(item1)).isTrue()
   }
 
   @Test
@@ -1399,7 +1399,85 @@ class MoreQuestionnaireItemComponentsTest {
         )
       }
     val item2 = Questionnaire.QuestionnaireItemComponent().apply { linkId = "B" }
-    assertThat(item2.isReferencedBy(item1)).isFalse()
+    assertThat(item2.isExpressionReferencedBy(item1)).isFalse()
+  }
+
+  @Test
+  fun `isExpressionReferencedBy should return true for reference with whitespace`() {
+    val item1 =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        linkId = "A"
+        addExtension(
+          EXTENSION_CALCULATED_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "%resource.item.where(linkId = 'B')"
+            this.language = "text/fhirpath"
+          },
+        )
+      }
+    val item2 = Questionnaire.QuestionnaireItemComponent().apply { linkId = "B" }
+    assertThat(item2.isExpressionReferencedBy(item1)).isTrue()
+  }
+
+  @Test
+  fun `isExpressionReferencedBy should return false for link id matching another one as a regex`() {
+    val item1 =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        linkId = "A"
+        addExtension(
+          EXTENSION_CALCULATED_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "%resource.item.where(linkId='BxB')"
+            this.language = "text/fhirpath"
+          },
+        )
+      }
+    // `.` is a regex metacharacter, so a link id containing one must not be reported as referenced
+    // just because the referenced link id has the same shape.
+    val item2 = Questionnaire.QuestionnaireItemComponent().apply { linkId = "B.B" }
+    assertThat(item2.isExpressionReferencedBy(item1)).isFalse()
+  }
+
+  @Test
+  fun `expressionReferencedLinkIds should return link ids of all expression based extensions`() {
+    val item =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        linkId = "A"
+        addExtension(EXTENSION_HIDDEN_URL, BooleanType(true))
+        addExtension(
+          EXTENSION_CALCULATED_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "%resource.item.where(linkId='B').answer.value"
+            this.language = "text/fhirpath"
+          },
+        )
+        addExtension(
+          EXTENSION_ENABLE_WHEN_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "%resource.item.where(linkId = 'C').answer.value.exists()"
+            this.language = "text/fhirpath"
+          },
+        )
+      }
+
+    assertThat(item.expressionReferencedLinkIds).containsExactly("B", "C")
+  }
+
+  @Test
+  fun `expressionReferencedLinkIds should return empty set for expression without reference`() {
+    val item =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        linkId = "A"
+        addExtension(
+          EXTENSION_CALCULATED_EXPRESSION_URL,
+          Expression().apply {
+            this.expression = "today()"
+            this.language = "text/fhirpath"
+          },
+        )
+      }
+
+    assertThat(item.expressionReferencedLinkIds).isEmpty()
   }
 
   @Test
