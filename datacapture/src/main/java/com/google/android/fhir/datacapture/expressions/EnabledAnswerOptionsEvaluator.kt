@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2024 Google LLC
+ * Copyright 2022-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import com.google.android.fhir.datacapture.extensions.extractAnswerOptions
 import com.google.android.fhir.datacapture.extensions.isFhirPath
 import com.google.android.fhir.datacapture.extensions.isXFhirQuery
 import com.google.android.fhir.datacapture.fhirpath.ExpressionEvaluator
+import com.google.android.fhir.datacapture.fhirpath.QuestionnaireExpressionCache
 import com.google.android.fhir.datacapture.fhirpath.convertToBoolean
 import org.hl7.fhir.r4.model.Coding
 import org.hl7.fhir.r4.model.Questionnaire
@@ -61,6 +62,7 @@ internal class EnabledAnswerOptionsEvaluator(
   private val questionnaireLaunchContextMap: Map<String, Resource>? = emptyMap(),
   private val xFhirQueryResolver: XFhirQueryResolver? = null,
   private val externalValueSetResolver: ExternalAnswerValueSetResolver? = null,
+  private val expressionCache: QuestionnaireExpressionCache = QuestionnaireExpressionCache(),
 ) {
 
   private val expressionEvaluator =
@@ -70,6 +72,7 @@ internal class EnabledAnswerOptionsEvaluator(
       questionnaireItemParentMap,
       questionnaireLaunchContextMap,
       xFhirQueryResolver,
+      expressionCache,
     )
 
   private val answerValueSetMap =

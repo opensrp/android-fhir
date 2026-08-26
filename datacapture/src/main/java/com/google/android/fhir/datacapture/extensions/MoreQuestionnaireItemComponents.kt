@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2025 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ import org.hl7.fhir.r4.model.CodeableConcept
 import org.hl7.fhir.r4.model.Coding
 import org.hl7.fhir.r4.model.DecimalType
 import org.hl7.fhir.r4.model.Expression
+import org.hl7.fhir.r4.model.Extension
 import org.hl7.fhir.r4.model.IntegerType
 import org.hl7.fhir.r4.model.Questionnaire
 import org.hl7.fhir.r4.model.Questionnaire.QuestionnaireItemComponent
@@ -732,31 +733,47 @@ internal val QuestionnaireItemComponent.expressionBasedExtensions
   get() = this.extension.filter { it.value is Expression }
 
 /**
+ * Matches a link ID reference inside an expression, e.g. `linkId='this-question'` in
+ * `%resource.item.where(linkId='this-question')`.
+ */
+private val LINK_ID_REFERENCE_REGEX = Regex("linkId='([^']*)'")
+
+/**
+ * The link IDs of the questionnaire items directly referenced by the expression based extensions of
+ * this element, e.g. `this-question` for an expression
+ * `%resource.item.where(linkId='this-question')`.
+ *
+ * Callers that test the same element repeatedly, e.g. once per answer the user gives, should hold
+ * on to the returned set instead of recomputing it.
+ */
+private fun List<Extension>.expressionReferencedLinkIds(): Set<String> =
+  flatMapTo(mutableSetOf()) { extension ->
+    LINK_ID_REFERENCE_REGEX.findAll(
+        extension.castToExpression(extension.value).expression.orEmpty().replace(" ", ""),
+      )
+      .map { it.groupValues[1] }
+  }
+
+/** See [expressionReferencedLinkIds]. */
+internal val QuestionnaireItemComponent.expressionReferencedLinkIds: Set<String>
+  get() = expressionBasedExtensions.expressionReferencedLinkIds()
+
+/** See [expressionReferencedLinkIds]. */
+internal val Questionnaire.expressionReferencedLinkIds: Set<String>
+  get() = expressionBasedExtensions.expressionReferencedLinkIds()
+
+/**
  * Whether [item] has any expression directly referencing the current questionnaire item by link ID
  * (e.g. if [item] has an expression `%resource.item.where(linkId='this-question')` where
  * `this-question` is the link ID of the current questionnaire item).
  */
 internal fun Questionnaire.QuestionnaireItemComponent.isExpressionReferencedBy(
   item: QuestionnaireItemComponent,
-) =
-  item.expressionBasedExtensions.any {
-    it
-      .castToExpression(it.value)
-      .expression
-      .replace(" ", "")
-      .contains(Regex(".*linkId='${this.linkId}'.*"))
-  }
+) = item.expressionReferencedLinkIds.contains(this.linkId)
 
 internal fun Questionnaire.QuestionnaireItemComponent.isExpressionReferencedBy(
   questionnaire: Questionnaire,
-) =
-  questionnaire.expressionBasedExtensions.any {
-    it
-      .castToExpression(it.value)
-      .expression
-      .replace(" ", "")
-      .contains(Regex(".*linkId='${this.linkId}'.*"))
-  }
+) = questionnaire.expressionReferencedLinkIds.contains(this.linkId)
 
 /**
  * Whether [item] has any expression directly referencing the current questionnaire item by link ID

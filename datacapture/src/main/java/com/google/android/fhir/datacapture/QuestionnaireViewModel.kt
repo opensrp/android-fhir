@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2025 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +58,7 @@ import com.google.android.fhir.datacapture.extensions.unpackRepeatedGroups
 import com.google.android.fhir.datacapture.extensions.validateLaunchContextExtensions
 import com.google.android.fhir.datacapture.extensions.zipByLinkId
 import com.google.android.fhir.datacapture.fhirpath.ExpressionEvaluator
+import com.google.android.fhir.datacapture.fhirpath.QuestionnaireExpressionCache
 import com.google.android.fhir.datacapture.mapping.asExpectedType
 import com.google.android.fhir.datacapture.validation.Invalid
 import com.google.android.fhir.datacapture.validation.NotValidated
@@ -388,6 +389,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
             questionnaireItemParentMap,
             questionnaireLaunchContextMap,
             xFhirQueryResolver,
+            expressionCache,
           )
       }
       modifiedQuestionnaireResponseItemSet.add(questionnaireResponseItem)
@@ -415,6 +417,12 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       }
     }
 
+  /**
+   * Memoizes expression evaluation for the duration of a single [getQuestionnaireState] call. See
+   * [QuestionnaireExpressionCache].
+   */
+  private val expressionCache = QuestionnaireExpressionCache()
+
   private val expressionEvaluator: ExpressionEvaluator =
     ExpressionEvaluator(
       questionnaire,
@@ -431,6 +439,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       questionnaireItemParentMap,
       questionnaireLaunchContextMap,
       xFhirQueryResolver,
+      expressionCache,
     )
 
   private val answerOptionsEvaluator: EnabledAnswerOptionsEvaluator =
@@ -441,6 +450,7 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       questionnaireLaunchContextMap,
       xFhirQueryResolver,
       externalValueSetResolver,
+      expressionCache,
     )
 
   private val questionnaireResponseItemValidator: QuestionnaireResponseItemValidator =
@@ -754,7 +764,17 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
    *
    * The traverse is carried out in the two lists in tandem.
    */
-  private suspend fun getQuestionnaireState(): QuestionnaireState {
+  private suspend fun getQuestionnaireState(): QuestionnaireState =
+    try {
+      // Answers only change between state computations - calculated expressions, the only writers,
+      // run outside this call - so expression results may be shared across items while it runs.
+      expressionCache.activate()
+      computeQuestionnaireState()
+    } finally {
+      expressionCache.deactivate()
+    }
+
+  private suspend fun computeQuestionnaireState(): QuestionnaireState {
     val questionnaireItemList = questionnaire.item
     val questionnaireResponseItemList = questionnaireResponse.item
 
@@ -1130,6 +1150,8 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
       responseItemToAnswersMapForDisabledQuestionnaireItem[questionnaireResponseItem] =
         questionnaireResponseItem.answer
       questionnaireResponseItem.answer = listOf()
+      // An expression evaluated earlier in this state computation may have read these answers.
+      expressionCache.invalidate()
     }
   }
 
@@ -1142,6 +1164,8 @@ internal class QuestionnaireViewModel(application: Application, state: SavedStat
     if (responseItemToAnswersMapForDisabledQuestionnaireItem.contains(questionnaireResponseItem)) {
       questionnaireResponseItem.answer =
         responseItemToAnswersMapForDisabledQuestionnaireItem.remove(questionnaireResponseItem)
+      // An expression evaluated earlier in this state computation may have read these answers.
+      expressionCache.invalidate()
     }
   }
 

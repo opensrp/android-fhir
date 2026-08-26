@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2024 Google LLC
+ * Copyright 2023-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@ package com.google.android.fhir.datacapture.fhirpath
 
 import com.google.android.fhir.datacapture.XFhirQueryResolver
 import com.google.android.fhir.datacapture.extensions.calculatedExpression
+import com.google.android.fhir.datacapture.extensions.expressionReferencedLinkIds
 import com.google.android.fhir.datacapture.extensions.findVariableExpression
 import com.google.android.fhir.datacapture.extensions.flattened
-import com.google.android.fhir.datacapture.extensions.isExpressionReferencedBy
 import com.google.android.fhir.datacapture.extensions.isFhirPath
 import com.google.android.fhir.datacapture.extensions.isXFhirQuery
 import com.google.android.fhir.datacapture.extensions.variableExpressions
@@ -64,6 +64,7 @@ internal class ExpressionEvaluator(
     emptyMap(),
   private val questionnaireLaunchContextMap: Map<String, Resource>? = emptyMap(),
   private val xFhirQueryResolver: XFhirQueryResolver? = null,
+  private val expressionCache: QuestionnaireExpressionCache = QuestionnaireExpressionCache(),
 ) {
 
   private val reservedItemVariables =
@@ -125,23 +126,49 @@ internal class ExpressionEvaluator(
 
   /** Detects if any item into list is referencing a dependent item in its calculated expression */
   internal fun detectExpressionCyclicDependency(items: List<QuestionnaireItemComponent>) {
-    items
-      .flattened()
-      .filter { it.calculatedExpression != null }
-      .run {
-        forEach { current ->
-          // no calculable item depending on current item should be used as dependency into current
-          // item
-          this.forEach { dependent ->
-            check(
-              !(current.isExpressionReferencedBy(dependent) &&
-                dependent.isExpressionReferencedBy(current)),
-            ) {
-              "${current.linkId} and ${dependent.linkId} have cyclic dependency in expression based extension"
-            }
-          }
+    val calculableItems = items.flattened().filter { it.calculatedExpression != null }
+    // Index aligned with `calculableItems`, so that the link IDs each item references are extracted
+    // from its expressions once instead of once per pair of items.
+    val referencedLinkIds = calculableItems.map { it.expressionReferencedLinkIds }
+    val calculableItemIndicesByReferencedLinkId = mutableMapOf<String, MutableList<Int>>()
+    referencedLinkIds.forEachIndexed { index, linkIds ->
+      linkIds.forEach {
+        calculableItemIndicesByReferencedLinkId.getOrPut(it) { mutableListOf() }.add(index)
+      }
+    }
+
+    calculableItems.forEachIndexed { currentIndex, current ->
+      // no calculable item depending on current item should be used as dependency into current
+      // item
+      calculableItemIndicesByReferencedLinkId[current.linkId]?.forEach { dependentIndex ->
+        val dependent = calculableItems[dependentIndex]
+        check(!referencedLinkIds[currentIndex].contains(dependent.linkId)) {
+          "${current.linkId} and ${dependent.linkId} have cyclic dependency in expression based extension"
         }
       }
+    }
+  }
+
+  /**
+   * The items of [questionnaire] that have a calculated expression, in pre-order.
+   *
+   * Computed once, as [evaluateAllAffectedCalculatedExpressions] walks these items every time an
+   * answer changes. This assumes the expression based extensions of [questionnaire] do not change
+   * while this evaluator is in use, which holds because a new evaluator is created for every
+   * questionnaire being rendered.
+   */
+  private val calculatedExpressionItems: List<QuestionnaireItemComponent> by lazy {
+    questionnaire.item.flattened().filter { it.calculatedExpression != null }
+  }
+
+  /** The dependencies of each item in [calculatedExpressionItems], in the same order. */
+  private val calculatedExpressionItemDependencies: List<CalculatedExpressionDependencies> by lazy {
+    calculatedExpressionItems.map { item ->
+      CalculatedExpressionDependencies(
+        referencedLinkIds = item.expressionReferencedLinkIds,
+        dependsOnVariables = findDependentVariables(item.calculatedExpression!!).isNotEmpty(),
+      )
+    }
   }
 
   /**
@@ -157,13 +184,119 @@ internal class ExpressionEvaluator(
     questionnaireResponseItem: QuestionnaireResponseItemComponent?,
     expression: Expression,
   ): List<Base> {
+    val cacheKey =
+      if (expressionCache.isActive) sharableResultKey(questionnaireItem, expression) else null
+    cacheKey?.let { key ->
+      expressionCache.cachedResult(key)?.let {
+        return it
+      }
+    }
+
     val appContext = extractItemDependentVariables(expression, questionnaireItem)
+    val result =
+      evaluateWithIndexedItemSearches(
+        questionnaireResponseItem,
+        expression.expression,
+        appContext,
+      )
+    cacheKey?.let { expressionCache.cacheResult(it, result) }
+    return result
+  }
+
+  /**
+   * Evaluates [expressionText] with the questionnaire response items its
+   * `%resource.repeat(item).where(linkId = …)` (leaf) and `%resource.item.where(linkId = …)` (tree)
+   * searches look for taken from [QuestionnaireResponseItemIndex], falling back to letting the
+   * engine search the response when there is nothing to index or no index to use.
+   *
+   * See [indexedItemSearchExpression] for what is rewritten, and
+   * [QuestionnaireExpressionCache.responseItemIndex] for when an index is available.
+   */
+  private fun evaluateWithIndexedItemSearches(
+    questionnaireResponseItem: QuestionnaireResponseItemComponent?,
+    expressionText: String,
+    variablesMap: Map<String, Base?>,
+  ): List<Base> {
+    // The rewrite is looked up first because it is cached per expression, while building an index
+    // costs a full `repeat(item)` evaluation, and an expression with no search to index gains
+    // nothing from one.
+    val indexedExpression =
+      if (expressionCache.isActive) indexedItemSearchExpression(expressionText) else null
+    val index =
+      indexedExpression?.let { expressionCache.responseItemIndex(questionnaireResponse) }
+        ?: return evaluateToBase(
+          questionnaireResponse,
+          questionnaireResponseItem,
+          expressionText,
+          variablesMap,
+        )
+
     return evaluateToBase(
-      questionnaireResponse,
-      questionnaireResponseItem,
-      expression.expression,
-      appContext,
+      questionnaireResponse = questionnaireResponse,
+      questionnaireResponseItem = questionnaireResponseItem,
+      expression = indexedExpression.expression,
+      contextMap = variablesMap,
+      itemCollections =
+        indexedExpression.itemCollections.mapValues { (_, collection) ->
+          index.items(collection.access, collection.linkId)
+        },
     )
+  }
+
+  /**
+   * The key under which the result of evaluating [expression] can be shared with the other
+   * questionnaire items evaluating the same expression, or `null` when the result depends on
+   * [questionnaireItem] and so cannot be shared.
+   *
+   * The result depends on the item when the expression reads the item through a FHIRPath
+   * supplement, when any path in it resolves against the evaluation base - which is the item's own
+   * questionnaire response item - or when it reads a variable that the item or one of its ancestors
+   * declares, shadowing the questionnaire level one.
+   */
+  private fun sharableResultKey(
+    questionnaireItem: QuestionnaireItemComponent,
+    expression: Expression,
+  ): String? {
+    val expressionText = expression.expression ?: return null
+    if (
+      expressionText.contains("%$questionnaireItemFhirPathSupplement") ||
+        expressionText.contains("%context")
+    ) {
+      return null
+    }
+    if (!isAnchoredAtVariable(extractExpressionNode(expressionText))) return null
+    if (findDependentVariables(expression).any { isItemScopedVariable(it, questionnaireItem) }) {
+      return null
+    }
+    return expressionText
+  }
+
+  private fun isItemScopedVariable(
+    variableName: String,
+    questionnaireItem: QuestionnaireItemComponent,
+  ) =
+    questionnaireItem.findVariableExpression(variableName) != null ||
+      findVariableInAncestors(variableName, questionnaireItem) != null
+
+  /**
+   * Whether every path in [node] that would otherwise resolve against the evaluation base is
+   * instead anchored at a variable, e.g. `%resource`. Only such an expression evaluates to the same
+   * value whichever item it is evaluated for.
+   *
+   * A [ExpressionNode.Kind.Name] or [ExpressionNode.Kind.Function] node in this position resolves
+   * against the base and makes the expression item specific. Nodes reached through `inner` or
+   * through a function's parameters do not need checking: they resolve against the result of what
+   * precedes them, which this function has already established is anchored.
+   */
+  private fun isAnchoredAtVariable(node: ExpressionNode?): Boolean {
+    if (node == null) return true
+    val anchored =
+      when (node.kind) {
+        ExpressionNode.Kind.Constant -> true
+        ExpressionNode.Kind.Group -> isAnchoredAtVariable(node.group)
+        else -> false
+      }
+    return anchored && isAnchoredAtVariable(node.opNext)
   }
 
   /**
@@ -194,14 +327,13 @@ internal class ExpressionEvaluator(
   suspend fun evaluateAllAffectedCalculatedExpressions(
     questionnaireItem: QuestionnaireItemComponent,
   ): List<ItemToAnswersPair> {
-    return questionnaire.item
-      .flattened()
-      .filter { item ->
-        // Condition 1. item is calculable
+    return calculatedExpressionItems
+      .filterIndexed { index, _ ->
+        // Condition 1. item is calculable, which every item in `calculatedExpressionItems` is
         // Condition 2. item answer depends on the updated item answer OR has a variable dependency
-        item.calculatedExpression != null &&
-          (questionnaireItem.isExpressionReferencedBy(item) ||
-            findDependentVariables(item.calculatedExpression!!).isNotEmpty())
+        val dependencies = calculatedExpressionItemDependencies[index]
+        dependencies.referencedLinkIds.contains(questionnaireItem.linkId) ||
+          dependencies.dependsOnVariables
       }
       .map { item ->
         // TODO: Pass the questionnaire response item corresponding to the
@@ -418,7 +550,9 @@ internal class ExpressionEvaluator(
       }
 
   private fun findDependentVariables(expression: Expression) =
-    variableRegex.findAll(expression.expression).map { it.groupValues[1] }.toList()
+    // `orEmpty` because the variables of every calculable item are now looked up up front, so a
+    // malformed expression without an expression string must not fail the whole questionnaire.
+    variableRegex.findAll(expression.expression.orEmpty()).map { it.groupValues[1] }.toList()
 
   /**
    * Finds the dependent variables at questionnaire item level first, then in ancestors and then at
@@ -452,10 +586,17 @@ internal class ExpressionEvaluator(
           )
         } // Finally, check the variables defined on the questionnaire itself
           ?: questionnaire.findVariableExpression(variableName)?.let { expression ->
-          evaluateQuestionnaireVariableExpression(
-            expression,
-            variablesMap,
-          )
+          // A questionnaire level variable evaluates to the same value for every item, so within a
+          // single questionnaire state computation it only has to be evaluated once.
+          if (expressionCache.hasCachedQuestionnaireVariable(variableName)) {
+            expressionCache.cachedQuestionnaireVariable(variableName)
+          } else {
+            evaluateQuestionnaireVariableExpression(
+                expression,
+                variablesMap,
+              )
+              .also { expressionCache.cacheQuestionnaireVariable(variableName, it) }
+          }
         }
 
     evaluatedValue?.also { variablesMap[variableName] = it }
@@ -516,11 +657,10 @@ internal class ExpressionEvaluator(
             }
         }
       } else if (expression.isFhirPath) {
-        evaluateToBase(
-            questionnaireResponse = questionnaireResponse,
+        evaluateWithIndexedItemSearches(
             questionnaireResponseItem = null,
-            expression = expression.expression,
-            contextMap = dependentVariables,
+            expressionText = expression.expression,
+            variablesMap = dependentVariables,
           )
           .firstOrNull()
       } else {
@@ -546,3 +686,15 @@ private fun extractResourceType(expressionNode: ExpressionNode): String? {
 
 /** Pair of a [Questionnaire.QuestionnaireItemComponent] with its evaluated answers */
 internal typealias ItemToAnswersPair = Pair<QuestionnaireItemComponent, List<Type>>
+
+/**
+ * What the calculated expression of a [Questionnaire.QuestionnaireItemComponent] depends on, i.e.
+ * what has to change for the expression to need re-evaluating.
+ *
+ * @param referencedLinkIds the link IDs the item's expression based extensions refer to
+ * @param dependsOnVariables whether the item's calculated expression refers to any variable
+ */
+private data class CalculatedExpressionDependencies(
+  val referencedLinkIds: Set<String>,
+  val dependsOnVariables: Boolean,
+)

@@ -30,7 +30,14 @@ internal object FHIRPathEngineHostServices : FHIRPathEngine.IEvaluationContext {
     name: String?,
     beforeContext: Boolean,
   ): List<Base>? =
-    ((appContext as? Map<*, *>)?.get(name) as? Base)?.let { listOf(it) } ?: emptyList()
+    when (val value = (appContext as? Map<*, *>)?.get(name)) {
+      is Base -> listOf(value)
+      // A constant may stand for a collection, as the constants replacing the
+      // `%resource.repeat(item)` searches of an expression do. A new list is returned because the
+      // engine treats what it gets as its own working list and may modify it.
+      is List<*> -> value.filterIsInstance<Base>()
+      else -> emptyList()
+    }
 
   override fun resolveConstantType(appContext: Any?, name: String?): TypeDetails {
     throw UnsupportedOperationException()

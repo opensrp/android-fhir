@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2024 Google LLC
+ * Copyright 2022-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,11 +33,42 @@ private val fhirPathEngine: FHIRPathEngine =
     }
   }
 
+/** The maximum number of parsed expressions kept in [expressionNodeCache]. */
+private const val MAX_CACHED_EXPRESSION_NODES = 512
+
+/**
+ * Parsed FHIRPath expressions, keyed by the expression they were parsed from, with the least
+ * recently used entry evicted once [MAX_CACHED_EXPRESSION_NODES] is exceeded.
+ *
+ * A questionnaire evaluates the same small set of expressions over and over: every item is
+ * re-evaluated on each UI state emission, i.e. on every answer the user gives, so the number of
+ * evaluations grows with (number of items x number of answers) while the number of distinct
+ * expressions stays constant. Parsing is therefore worth doing once per expression instead of once
+ * per evaluation.
+ *
+ * Sharing a parsed [ExpressionNode] between evaluations is safe: [FHIRPathEngine] only mutates the
+ * nodes while parsing them and while type checking them in `check`, which this library never calls.
+ */
+private val expressionNodeCache =
+  // `accessOrder = true` so that eviction is least recently used rather than insertion ordered.
+  object : LinkedHashMap<String, ExpressionNode>(64, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ExpressionNode>) =
+      size > MAX_CACHED_EXPRESSION_NODES
+  }
+
+/** Returns the parsed [expression], parsing it only if it is not already cached. */
+private fun parseExpression(expression: String): ExpressionNode =
+  synchronized(expressionNodeCache) {
+    expressionNodeCache.getOrPut(expression) { fhirPathEngine.parse(expression) }
+  }
+
 /**
  * Evaluates the expressions over list of resources [Resource] and joins to space separated string
  */
 internal fun evaluateToDisplay(expressions: List<String>, data: Resource) =
-  expressions.joinToString(" ") { fhirPathEngine.evaluateToString(data, it) }
+  expressions.joinToString(" ") {
+    fhirPathEngine.convertToString(fhirPathEngine.evaluate(data, parseExpression(it)))
+  }
 
 /** Evaluates the expression over resource [Resource] and returns string value */
 internal fun evaluateToString(
@@ -66,13 +97,12 @@ internal fun evaluateToBoolean(
   expression: String,
   contextMap: Map<String, Base?> = mapOf(),
 ): Boolean {
-  val expressionNode = fhirPathEngine.parse(expression)
   return fhirPathEngine.evaluateToBoolean(
     contextMap,
     questionnaireResponse,
     null,
     questionnaireResponseItemComponent,
-    expressionNode,
+    parseExpression(expression),
   )
 }
 
@@ -83,27 +113,45 @@ internal fun evaluateToBoolean(
  * constants are passed as contextMap
  *
  * %resource = [QuestionnaireResponse], %context = [QuestionnaireResponseItemComponent]
+ *
+ * [itemCollections] holds the questionnaire response items the constants of an
+ * [IndexedItemSearchExpression] stand for, if [expression] is one.
  */
 internal fun evaluateToBase(
   questionnaireResponse: QuestionnaireResponse?,
   questionnaireResponseItem: QuestionnaireResponseItemComponent?,
   expression: String,
   contextMap: Map<String, Base?> = mapOf(),
+  itemCollections: Map<String, List<Base>> = emptyMap(),
 ): List<Base> {
   return fhirPathEngine.evaluate(
-    /* appContext = */ contextMap,
+    /* appContext = */ appContextOf(contextMap, itemCollections),
     /* focusResource = */ questionnaireResponse,
     /* rootResource = */ null,
     /* base = */ questionnaireResponseItem,
-    /* path = */ expression,
+    /* node = */ parseExpression(expression),
   )
 }
+
+/**
+ * The constants to evaluate an expression with: the variables in [contextMap], and the collections
+ * in [itemCollections] that the constants of an [IndexedItemSearchExpression] stand for.
+ */
+private fun appContextOf(
+  contextMap: Map<String, Base?>,
+  itemCollections: Map<String, List<Base>>,
+): Map<String, Any?> =
+  if (itemCollections.isEmpty()) {
+    contextMap
+  } else {
+    HashMap<String, Any?>(contextMap).apply { putAll(itemCollections) }
+  }
 
 /** Evaluates the given expression and returns list of [Base] */
 internal fun evaluateToBase(base: Base, expression: String): List<Base> {
   return fhirPathEngine.evaluate(
     /* base = */ base,
-    /* path = */ expression,
+    /* node = */ parseExpression(expression),
   )
 }
 
@@ -111,4 +159,4 @@ internal fun evaluateToBase(base: Base, expression: String): List<Base> {
 internal fun convertToBoolean(items: List<Base>) = fhirPathEngine.convertToBoolean(items)
 
 /** Parse the given expression into [ExpressionNode] */
-internal fun extractExpressionNode(fhirPath: String) = fhirPathEngine.parse(fhirPath)
+internal fun extractExpressionNode(fhirPath: String) = parseExpression(fhirPath)

@@ -889,6 +889,108 @@ class EnablementEvaluatorTest {
    *
    * See https://www.hl7.org/fhir/valueset-questionnaire-enable-behavior.html.
    */
+  @Test
+  fun evaluate_multipleOccurrencesOfQuestion_shouldUseNearestAncestor() {
+    val origin = QuestionnaireResponse.QuestionnaireResponseItemComponent().apply { linkId = "o" }
+    val questionnaireResponse =
+      QuestionnaireResponse().apply {
+        addItem(answeredItem("q", 1))
+        addItem(answeredItem("q", 3).apply { addItem(origin) })
+      }
+
+    assertThat(evaluateEnableWhenEqual(questionnaireResponse, origin, "q", 3)).isTrue()
+    assertThat(evaluateEnableWhenEqual(questionnaireResponse, origin, "q", 1)).isFalse()
+  }
+
+  @Test
+  fun evaluate_multipleOccurrencesOfQuestion_shouldUseNearestPrecedingOverFollowing() {
+    val origin = QuestionnaireResponse.QuestionnaireResponseItemComponent().apply { linkId = "o" }
+    val questionnaireResponse =
+      QuestionnaireResponse().apply {
+        addItem(answeredItem("q", 1))
+        addItem(
+          QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
+            linkId = "group"
+            addItem(origin)
+          },
+        )
+        addItem(answeredItem("q", 2))
+      }
+
+    assertThat(evaluateEnableWhenEqual(questionnaireResponse, origin, "q", 1)).isTrue()
+    assertThat(evaluateEnableWhenEqual(questionnaireResponse, origin, "q", 2)).isFalse()
+  }
+
+  @Test
+  fun evaluate_onlyFollowingOccurrenceOfQuestion_shouldUseIt() {
+    val origin = QuestionnaireResponse.QuestionnaireResponseItemComponent().apply { linkId = "o" }
+    val questionnaireResponse =
+      QuestionnaireResponse().apply {
+        addItem(
+          QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
+            linkId = "group"
+            addItem(origin)
+          },
+        )
+        addItem(answeredItem("q", 2))
+      }
+
+    assertThat(evaluateEnableWhenEqual(questionnaireResponse, origin, "q", 2)).isTrue()
+  }
+
+  @Test
+  fun evaluate_questionIsTheItemItself_shouldUseAnotherOccurrence() {
+    val origin = answeredItem("q", 1)
+    val questionnaireResponse =
+      QuestionnaireResponse().apply {
+        addItem(
+          QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
+            linkId = "group"
+            addItem(origin)
+          },
+        )
+        addItem(answeredItem("q", 2))
+      }
+
+    assertThat(evaluateEnableWhenEqual(questionnaireResponse, origin, "q", 2)).isTrue()
+    assertThat(evaluateEnableWhenEqual(questionnaireResponse, origin, "q", 1)).isFalse()
+  }
+
+  private fun answeredItem(linkId: String, answer: Int) =
+    QuestionnaireResponse.QuestionnaireResponseItemComponent().apply {
+      this.linkId = linkId
+      addAnswer(QuestionnaireResponseItemAnswerComponent().apply { value = IntegerType(answer) })
+    }
+
+  /**
+   * Whether an item with an `enableWhen` requiring [question] to be answered [expected] is enabled
+   * for [origin], so that which occurrence of [question] the evaluator picks is observable.
+   */
+  private fun evaluateEnableWhenEqual(
+    questionnaireResponse: QuestionnaireResponse,
+    origin: QuestionnaireResponse.QuestionnaireResponseItemComponent,
+    question: String,
+    expected: Int,
+  ): Boolean {
+    val questionnaireItem =
+      Questionnaire.QuestionnaireItemComponent().apply {
+        type = Questionnaire.QuestionnaireItemType.BOOLEAN
+        addEnableWhen(
+          Questionnaire.QuestionnaireItemEnableWhenComponent()
+            .setQuestion(question)
+            .setOperator(Questionnaire.QuestionnaireItemOperator.EQUAL)
+            .setAnswer(IntegerType(expected)),
+        )
+      }
+    return runBlocking {
+      EnablementEvaluator(
+          Questionnaire().apply { addItem(questionnaireItem) },
+          questionnaireResponse,
+        )
+        .evaluate(questionnaireItem, origin)
+    }
+  }
+
   private fun assertEnableWhen(
     behavior: Questionnaire.EnableWhenBehavior? = null,
     vararg enableWhen: EnableWhen,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2023 Google LLC
+ * Copyright 2022-2026 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,5 +40,40 @@ class FhirPathUtilTest {
       }
 
     assertThat(evaluateToDisplay(expressions, resource)).isEqualTo("John Doe")
+  }
+
+  @Test
+  fun `evaluateToBase should return the same result when an expression is evaluated repeatedly`() {
+    // Parsed expressions are cached and shared between evaluations, so re-evaluating an expression
+    // must keep returning the result for the base it is evaluated against, and evaluating another
+    // expression in between must not affect it.
+    val patient =
+      Patient().apply {
+        addName(
+          HumanName().apply {
+            this.family = "Doe"
+            this.addGiven("John")
+          },
+        )
+      }
+
+    val given = evaluateToBase(patient, "name.given").map { it.primitiveValue() }
+    val family = evaluateToBase(patient, "name.family").map { it.primitiveValue() }
+
+    assertThat(given).containsExactly("John")
+    assertThat(family).containsExactly("Doe")
+    assertThat(evaluateToBase(patient, "name.given").map { it.primitiveValue() }).isEqualTo(given)
+    assertThat(evaluateToBase(patient, "name.family").map { it.primitiveValue() }).isEqualTo(family)
+  }
+
+  @Test
+  fun `evaluateToBase should evaluate the same expression against different resources`() {
+    val john = Patient().apply { addName(HumanName().apply { this.addGiven("John") }) }
+    val jane = Patient().apply { addName(HumanName().apply { this.addGiven("Jane") }) }
+
+    assertThat(evaluateToBase(john, "name.given").map { it.primitiveValue() })
+      .containsExactly("John")
+    assertThat(evaluateToBase(jane, "name.given").map { it.primitiveValue() })
+      .containsExactly("Jane")
   }
 }
