@@ -55,6 +55,27 @@ class FHIRPathEngineHostServicesTest {
   }
 
   @Test
+  fun testFHIRPathHostServices_resolveConstantListValue_returnsEveryElement() {
+    val answer =
+      FHIRPathEngineHostServices.resolveConstant(
+        mapOf("A" to listOf(IntegerType(1), IntegerType(2))),
+        "A",
+        true,
+      )
+
+    assertThat(answer?.map { (it as Type).asStringValue() }).containsExactly("1", "2").inOrder()
+  }
+
+  @Test
+  fun testFHIRPathHostServices_resolveConstantListValue_returnsCopyTheEngineMayModify() {
+    val items = listOf(IntegerType(1))
+
+    val answer = FHIRPathEngineHostServices.resolveConstant(mapOf("A" to items), "A", true)
+
+    assertThat(answer).isNotSameInstanceAs(items)
+  }
+
+  @Test
   fun testFHIRPathHostServices_resolveConstantType_throwsUnsupportedOperationException() {
     assertThrows(UnsupportedOperationException::class.java) {
       FHIRPathEngineHostServices.resolveConstantType(mapOf<Any, Any>(), "")

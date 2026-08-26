@@ -106,6 +106,24 @@ internal class EnablementEvaluator(
       QuestionnaireResponse.QuestionnaireResponseItemComponent,
     >()
 
+  /**
+   * The position in [questionnaireResponseItemPreOrderList] of each item in it, so that the item an
+   * `enableWhen` constraint is evaluated for is located without scanning the list.
+   *
+   * The first position is kept for an item that appears more than once, which is what
+   * [List.indexOf] returned before.
+   */
+  private val questionnaireResponseItemPreOrderIndexMap =
+    mutableMapOf<QuestionnaireResponse.QuestionnaireResponseItemComponent, Int>()
+
+  /**
+   * The positions in [questionnaireResponseItemPreOrderList] of the items with each link ID, in
+   * ascending order, so that the occurrence nearest to a given position is found by binary search
+   * rather than by scanning the whole list twice.
+   */
+  private val questionnaireResponseItemPreOrderIndicesByLinkId =
+    mutableMapOf<String?, MutableList<Int>>()
+
   init {
     /** Adds each child-parent pair in the [QuestionnaireResponse] to the parent map. */
     fun buildParentList(item: QuestionnaireResponse.QuestionnaireResponseItemComponent) {
@@ -122,6 +140,13 @@ internal class EnablementEvaluator(
 
     for (item in questionnaireResponse.item) {
       buildParentList(item)
+    }
+
+    questionnaireResponseItemPreOrderList.forEachIndexed { index, item ->
+      questionnaireResponseItemPreOrderIndexMap.putIfAbsent(item, index)
+      questionnaireResponseItemPreOrderIndicesByLinkId
+        .getOrPut(item.linkId) { mutableListOf() }
+        .add(index)
     }
   }
 
@@ -234,19 +259,25 @@ internal class EnablementEvaluator(
       parent = questionnaireResponseItemParentMap[parent]
     }
 
+    // The positions of the candidates, ascending, so that the ones preceding the origin and the
+    // ones succeeding it are separated by where the origin's own position falls among them.
+    val candidateIndices =
+      questionnaireResponseItemPreOrderIndicesByLinkId[linkId] ?: return null
+    val originIndex = questionnaireResponseItemPreOrderIndexMap[origin] ?: -1
+    val originPosition = candidateIndices.binarySearch(originIndex)
+    // The origin itself is neither preceding nor succeeding, so it is excluded from both, whether or
+    // not it is a candidate.
+    val precedingCount = if (originPosition >= 0) originPosition else -(originPosition + 1)
+    val succeedingFrom = if (originPosition >= 0) originPosition + 1 else precedingCount
+
     // Find the nearest item preceding the origin
-    val itemIndex = questionnaireResponseItemPreOrderList.indexOf(origin)
-    for (index in itemIndex - 1 downTo 0) {
-      if (questionnaireResponseItemPreOrderList[index].linkId == linkId) {
-        return questionnaireResponseItemPreOrderList[index]
-      }
+    if (precedingCount > 0) {
+      return questionnaireResponseItemPreOrderList[candidateIndices[precedingCount - 1]]
     }
 
     // Find the nearest item succeeding the origin
-    for (index in itemIndex + 1 until questionnaireResponseItemPreOrderList.size) {
-      if (questionnaireResponseItemPreOrderList[index].linkId == linkId) {
-        return questionnaireResponseItemPreOrderList[index]
-      }
+    if (succeedingFrom < candidateIndices.size) {
+      return questionnaireResponseItemPreOrderList[candidateIndices[succeedingFrom]]
     }
 
     return null

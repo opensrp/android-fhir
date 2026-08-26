@@ -113,21 +113,39 @@ internal fun evaluateToBoolean(
  * constants are passed as contextMap
  *
  * %resource = [QuestionnaireResponse], %context = [QuestionnaireResponseItemComponent]
+ *
+ * [itemCollections] holds the questionnaire response items the constants of an
+ * [IndexedItemSearchExpression] stand for, if [expression] is one.
  */
 internal fun evaluateToBase(
   questionnaireResponse: QuestionnaireResponse?,
   questionnaireResponseItem: QuestionnaireResponseItemComponent?,
   expression: String,
   contextMap: Map<String, Base?> = mapOf(),
+  itemCollections: Map<String, List<Base>> = emptyMap(),
 ): List<Base> {
   return fhirPathEngine.evaluate(
-    /* appContext = */ contextMap,
+    /* appContext = */ appContextOf(contextMap, itemCollections),
     /* focusResource = */ questionnaireResponse,
     /* rootResource = */ null,
     /* base = */ questionnaireResponseItem,
     /* node = */ parseExpression(expression),
   )
 }
+
+/**
+ * The constants to evaluate an expression with: the variables in [contextMap], and the collections
+ * in [itemCollections] that the constants of an [IndexedItemSearchExpression] stand for.
+ */
+private fun appContextOf(
+  contextMap: Map<String, Base?>,
+  itemCollections: Map<String, List<Base>>,
+): Map<String, Any?> =
+  if (itemCollections.isEmpty()) {
+    contextMap
+  } else {
+    HashMap<String, Any?>(contextMap).apply { putAll(itemCollections) }
+  }
 
 /** Evaluates the given expression and returns list of [Base] */
 internal fun evaluateToBase(base: Base, expression: String): List<Base> {

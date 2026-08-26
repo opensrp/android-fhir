@@ -17,6 +17,7 @@
 package com.google.android.fhir.datacapture.fhirpath
 
 import org.hl7.fhir.r4.model.Base
+import org.hl7.fhir.r4.model.QuestionnaireResponse
 
 /**
  * Memoizes expression evaluation for the duration of a single questionnaire state computation.
@@ -43,6 +44,8 @@ internal class QuestionnaireExpressionCache {
 
   private val questionnaireVariableValues = mutableMapOf<String, Base?>()
 
+  private var responseItemIndex: QuestionnaireResponseItemIndex? = null
+
   /** Starts memoizing, discarding anything memoized earlier. */
   fun activate() {
     invalidate()
@@ -59,6 +62,24 @@ internal class QuestionnaireExpressionCache {
   fun invalidate() {
     expressionResults.clear()
     questionnaireVariableValues.clear()
+    // The index reflects the answers as well as the structure of the response, because
+    // `repeat(item)` drops items that are equal to one it has already reached.
+    responseItemIndex = null
+  }
+
+  /**
+   * The items of [questionnaireResponse] indexed by link ID, built on first use, or `null` while
+   * memoizing is off.
+   *
+   * The index is only handed out while memoizing because that is the span over which it is known to
+   * stay valid: outside it the answers change without [invalidate] being called.
+   */
+  fun responseItemIndex(
+    questionnaireResponse: QuestionnaireResponse,
+  ): QuestionnaireResponseItemIndex? {
+    if (!isActive) return null
+    return responseItemIndex
+      ?: QuestionnaireResponseItemIndex(questionnaireResponse).also { responseItemIndex = it }
   }
 
   fun cachedResult(key: String): List<Base>? = if (isActive) expressionResults[key] else null

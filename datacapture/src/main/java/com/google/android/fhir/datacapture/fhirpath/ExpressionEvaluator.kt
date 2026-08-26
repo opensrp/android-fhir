@@ -194,14 +194,53 @@ internal class ExpressionEvaluator(
 
     val appContext = extractItemDependentVariables(expression, questionnaireItem)
     val result =
-      evaluateToBase(
-        questionnaireResponse,
+      evaluateWithIndexedItemSearches(
         questionnaireResponseItem,
         expression.expression,
         appContext,
       )
     cacheKey?.let { expressionCache.cacheResult(it, result) }
     return result
+  }
+
+  /**
+   * Evaluates [expressionText] with the questionnaire response items its
+   * `%resource.repeat(item).where(linkId = …)` (leaf) and `%resource.item.where(linkId = …)` (tree)
+   * searches look for taken from [QuestionnaireResponseItemIndex], falling back to letting the
+   * engine search the response when there is nothing to index or no index to use.
+   *
+   * See [indexedItemSearchExpression] for what is rewritten, and
+   * [QuestionnaireExpressionCache.responseItemIndex] for when an index is available.
+   */
+  private fun evaluateWithIndexedItemSearches(
+    questionnaireResponseItem: QuestionnaireResponseItemComponent?,
+    expressionText: String,
+    variablesMap: Map<String, Base?>,
+  ): List<Base> {
+    // The rewrite is looked up first because it is cached per expression, while building an index
+    // costs a full `repeat(item)` evaluation, and an expression with no search to index gains
+    // nothing from one.
+    val indexedExpression =
+      if (expressionCache.isActive) indexedItemSearchExpression(expressionText) else null
+    val index =
+      indexedExpression?.let { expressionCache.responseItemIndex(questionnaireResponse) }
+        ?: return evaluateToBase(
+          questionnaireResponse,
+          questionnaireResponseItem,
+          expressionText,
+          variablesMap,
+        )
+
+    return evaluateToBase(
+      questionnaireResponse = questionnaireResponse,
+      questionnaireResponseItem = questionnaireResponseItem,
+      expression = indexedExpression.expression,
+      contextMap = variablesMap,
+      itemCollections =
+        indexedExpression.itemCollections.mapValues { (_, collection) ->
+          index.items(collection.access, collection.linkId)
+        },
+    )
   }
 
   /**
@@ -618,11 +657,10 @@ internal class ExpressionEvaluator(
             }
         }
       } else if (expression.isFhirPath) {
-        evaluateToBase(
-            questionnaireResponse = questionnaireResponse,
+        evaluateWithIndexedItemSearches(
             questionnaireResponseItem = null,
-            expression = expression.expression,
-            contextMap = dependentVariables,
+            expressionText = expression.expression,
+            variablesMap = dependentVariables,
           )
           .firstOrNull()
       } else {
